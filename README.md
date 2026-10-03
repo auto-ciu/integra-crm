@@ -1,5 +1,7 @@
 # Integra CRM — Twenty App (Requirement 4: data model)
 
+[![CI](https://github.com/auto-ciu/integra-crm/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/auto-ciu/integra-crm/actions/workflows/ci.yml)
+
 The Integra flywheel data model as ONE Twenty App package (`@integra/crm-app`),
 installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 
