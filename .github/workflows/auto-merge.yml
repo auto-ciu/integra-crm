@@ -1,0 +1,50 @@
+name: Auto-merge
+# Squash-merges a PR into main once the CI workflow has passed on its head.
+#
+# Triggered by `workflow_run`, not `check_suite`: GitHub does not fire
+# `check_suite` for suites created by GitHub Actions, so a check_suite
+# listener would never see CI finish.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0] != null
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Merge if every check on the head commit passed
+        run: |
+          state=$(gh pr view "$PR" --json state,isDraft,baseRefName --jq '[.state, .isDraft, .baseRefName] | join(" ")')
+          if [ "$state" != "OPEN false main" ]; then
+            echo "PR #$PR is not an open, ready PR into main ($state); skipping."
+            exit 0
+          fi
+          # Every check run on the head commit (not only CI's) must have
+          # succeeded or been skipped; this run itself is not a check on it.
+          failing=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/check-runs?per_page=100" \
+            --jq '[.check_runs[] | select(.status != "completed" or (.conclusion | IN("success","skipped","neutral") | not)) | .name] | join(", ")')
+          if [ -n "$failing" ]; then
+            echo "Not merging PR #$PR: checks not green: $failing"
+            exit 0
+          fi
+          # --match-head-commit: refuse if the PR moved since CI ran.
+          gh pr merge "$PR" --squash --delete-branch --match-head-commit "$HEAD_SHA"
+      - name: Run CI on main
+        # The merge commit was pushed with GITHUB_TOKEN, which does not
+        # trigger `push` workflows; dispatch CI so main's head gets a status.
+        run: gh workflow run ci.yml --ref main
