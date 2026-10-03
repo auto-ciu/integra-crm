@@ -9,22 +9,27 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/index.ts                     defineApplication (nothing else — see "One entity per file")
 ├── src/app-role.ts                  defineApplicationRole: the app token's role (read-only)
 ├── src/ids.ts                       every universalIdentifier this app owns (stable; never reuse)
-├── src/standard-ids.ts              Twenty's own ids for Company / Person / Opportunity (+ stage)
+├── src/standard-ids.ts              Twenty's own ids for Company / Person / Opportunity (+ stage) / WorkspaceMember
 ├── src/options.ts                   shared select option sets (EN · 中文)
 ├── src/lib/sdk.ts                   the ONLY import of twenty-sdk/define
 ├── src/lib/fields.ts                text/select/date/currency/relation constructors
 ├── src/lib/data.ts                  the ONLY data-API call site for the front components
 ├── src/lib/theme.ts                 --t-* token styles; brand gold pair as var() fallbacks
-├── src/objects/{company,person,opportunity}/*.field.ts   standard-object extensions (defineField)
-├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority
-├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, widgets
-├── src/page-layouts/                AR Mandate record page (5 tabs), Today (standalone)
-├── src/front-components/            RenewalBanner, RenewalCountWidget
-├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities
+├── src/objects/{company,person,opportunity,workspace-member}/*.field.ts   standard-object extensions (defineField)
+├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule
+├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban, widgets
+├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Today (standalone)
+├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub)
+├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries
+├── src/logic-functions/             F0.3 spike: health-check (httpRoute), company-created (databaseEvent), daily-heartbeat (cron)
+├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub). Not app entities
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
 ├── shared/urgency.mjs               renewal maths shared by widgets and the nightly job
+├── shared/icp.mjs                   freemail list + e-mail-domain → Company matching
+├── ops/lib/twenty-api.{mjs,ts}      REST/metadata client (ops scripts; .ts port for the sidecar)
 ├── ops/nightly-status.mjs           urgency/status recompute via REST (idempotent, --dry-run)
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
+├── docs/logic-function-spike.md     F0.3 findings: what logic functions can do on 2.41, and the decision
 └── verify-model.mjs                 dependency-free static check (npm run verify)
 ```
 
@@ -56,13 +61,17 @@ TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run nightly:dry  # t
 
 | Object | Kind | Fields added |
 | --- | --- | --- |
-| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents inverses) |
-| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus |
-| Opportunity | extend | productLine, tier; stage set replaced by `ops/sync-opportunity-stages.mjs` |
+| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents, enquiries inverses) |
+| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus (+ enquiries inverse) |
+| Opportunity | extend | productLine, tier (+ enquiries inverse); stage set replaced by `ops/sync-opportunity-stages.mjs` |
+| WorkspaceMember | extend | enquiryRoutingRules inverse (unverified on a live server, see below) |
 | AR Mandate | new | company→, status, startDate, endDate, renewalDate, docusignEnvelopeId, annualFee (EUR), signatory, urgency (computed), documents (files), products |
 | Mandate Product | new | arMandate→, productName, category, dppStatus |
 | Training Event | new | title (`name`), date, channel, attendeeCount, company→ |
 | Authority | new | name, authorityType, country, notes |
+| Enquiry | new | reference (unique, label), intakeId (unique), status, priority, category, subject, language, source, sourcePage, utmSource/Medium/Campaign, spamCheck, triageNotes, closedAt, relatedCompany→, relatedPerson→, relatedOpportunity→, messages |
+| Enquiry Message | new | name, enquiry→, direction, body, senderEmail, sentAt, isAutoReply |
+| Enquiry Routing Rule | new | name, category, language, assignTo→WorkspaceMember, isActive, priority |
 
 Urgency windows (days to `renewalDate`): **None** > 180 · **Watch** 90–180 ·
 **Due** < 90 · **Overdue** < 0. `Active` flips to `Expiring` inside 90 days.
@@ -97,8 +106,9 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
   navigation shapes, `defineFrontComponent` (from `twenty-sdk/define`) and
   `useRecordId` (from `twenty-sdk/front-component`).
 - `npm run build` (`twenty dev:build`) succeeds with no warnings and the
-  manifest holds every entity: 4 objects, 16 standard-object fields, 6 views,
-  2 front components, 2 page layouts, 4 navigation items, 1 role.
+  manifest holds every entity: 7 objects, 20 standard-object fields, 11 views,
+  3 front components, 3 page layouts, 5 navigation items, 3 logic functions,
+  1 role.
 - `src/standard-ids.ts` matches the SDK's `STANDARD_OBJECT` constants.
 
 **Not** verified — these need a running Twenty (`npm run dev` against
@@ -113,6 +123,20 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
    `viewUniversalIdentifier` (the `VIEW` widget carries no view id in 2.41).
    Whether the record-page table is scoped to the current mandate is
    unconfirmed.
+4. E1 enquiries:
+   - The Enquiry record page's Messages table (`RECORD_TABLE`) has the same
+     scoping question as item 3.
+   - `EnquiryRoutingRule.assignTo` is a relation to WorkspaceMember, which
+     needs an inverse field on that system object. If `twenty dev` rejects
+     it, delete `src/objects/workspace-member/` and use a TEXT `assigneeEmail`
+     instead (F0.4).
+   - The Enquiries table's `createdAt` column uses the SDK's derived
+     system-field id (`views/columns.ts → systemFieldId`).
+   - `reference` and `intakeId` rely on `isUnique` on TEXT fields.
+5. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
+   `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
+   also need cron registration on the worker. See
+   `docs/logic-function-spike.md`.
 
 Note for the e2e: the spec's sample values `productCategory: 'IVD'` and
 `tier: 'Tier 2'` are not options of the selects specified for this model

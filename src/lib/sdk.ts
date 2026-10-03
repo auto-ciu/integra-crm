@@ -20,6 +20,8 @@ export {
   definePageLayout,
   defineNavigationMenuItem,
   defineFrontComponent,
+  defineLogicFunction,
+  getFieldUniversalIdentifier,
   FieldType,
   RelationType,
   AggregateOperations,
@@ -31,6 +33,7 @@ export {
   PageLayoutTabLayoutMode,
   PageLayoutWidgetVerticalListHeightBehavior,
   NavigationMenuItemType,
+  HTTPMethod,
 } from 'twenty-sdk/define';
 export type {
   PageLayoutWidgetGridPosition,

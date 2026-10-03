@@ -37,6 +37,18 @@ export const text = (f: Base) => ({
   defaultValue: "''",
 });
 
+/**
+ * TEXT with a unique index. Defaults to NULL rather than '' so records created
+ * without a value don't collide on the empty string.
+ */
+export const uniqueText = (f: Base) => ({
+  ...f,
+  type: FieldType.TEXT as const,
+  isNullable: true as const,
+  isUnique: true,
+  defaultValue: null,
+});
+
 export const richText = (f: Base) => ({
   ...f,
   type: FieldType.RICH_TEXT as const,
@@ -47,6 +59,19 @@ export const date = (f: Base) => ({
   ...f,
   type: FieldType.DATE as const,
   isNullable: true as const,
+});
+
+export const dateTime = (f: Base) => ({
+  ...f,
+  type: FieldType.DATE_TIME as const,
+  isNullable: true as const,
+});
+
+export const boolean = ({ defaultValue = false, ...f }: Base & { defaultValue?: boolean }) => ({
+  ...f,
+  type: FieldType.BOOLEAN as const,
+  isNullable: false as const,
+  defaultValue,
 });
 
 export const number = ({ decimals = 0, ...f }: Base & { decimals?: number }) => ({
