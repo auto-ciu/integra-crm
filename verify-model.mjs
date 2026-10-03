@@ -22,6 +22,8 @@
  *      `export default defineX(` — the only form twenty-sdk's manifest
  *      builder registers (named exports and `export default someConst` are
  *      silently skipped).
+ *  10. E1: the Enquiries inbox kanban is built from ENQUIRY_STATUS, and
+ *      shared/icp.mjs never matches a Company by a freemail domain.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -36,6 +38,10 @@ const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}
 const REQUIRED_STAGES = ['Lead', 'Webinar attended', 'Trial', 'Subscribed', 'Renewal due', 'Lost'];
 const REQUIRED_COMPANY_LABELS = ['WeChat ID', 'Province', 'Product category', 'Tier'];
 const ALLOWED_HEX = new Set(['#c5a059', '#775a19']);
+const EXPECTED_OBJECTS = [
+  'ArMandate', 'MandateProduct', 'TrainingEvent', 'Authority',
+  'Enquiry', 'EnquiryMessage', 'EnquiryRoutingRule',
+];
 
 const failures = [];
 const passes = [];
@@ -59,7 +65,7 @@ const read = (name) => readFileSync(join(ROOT, name), 'utf8');
 // src/lib/fields.ts), which would otherwise be counted as a call.
 const stripComments = (src) =>
   src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/\/\/[^\n]*/g, '');
-const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|PageLayout|PageLayoutTab|PageLayoutWidget|FrontComponent|NavigationMenuItem))\(\{/g;
+const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|PageLayout|PageLayoutTab|PageLayoutWidget|FrontComponent|NavigationMenuItem|LogicFunction))\(\{/g;
 
 // ---------------------------------------------------------------- 1. ids.ts
 {
@@ -115,9 +121,11 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
       if (!new RegExp(`\\b${key}\\s*:`).test(text)) problems.push(`${rel(file)} lacks ${key}`);
     }
   }
-  if (objectFiles.length !== 4) fail(`expected 4 custom object files, found ${objectFiles.length}`);
+  if (objectFiles.length !== EXPECTED_OBJECTS.length) {
+    fail(`expected ${EXPECTED_OBJECTS.length} custom object files, found ${objectFiles.length}`);
+  }
   if (problems.length) fail(problems.join('; '));
-  else ok(`${objectFiles.length} custom objects (ArMandate, MandateProduct, TrainingEvent, Authority) declare names, labels and a label identifier`);
+  else ok(`${objectFiles.length} custom objects (${EXPECTED_OBJECTS.join(', ')}) declare names, labels and a label identifier`);
 }
 
 // ----------------------------------------------------------- 4. stage set
@@ -225,6 +233,36 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
   }
   if (problems.length) fail(`not discoverable by the twenty-sdk manifest builder: ${problems.join('; ')}`);
   else ok(`${entities} entity files, each a single \`export default define*()\` (twenty-sdk builder form)`);
+}
+
+// ------------------------------------------- 10. E1 enquiries: kanban + freemail
+{
+  const kanban = read('src/views/enquiries-kanban.view.ts');
+  if (!/ENQUIRY_STATUS\.map\(/.test(kanban)) fail('enquiries-kanban.view.ts does not build its groups from ENQUIRY_STATUS');
+  if (!/mainGroupByFieldMetadataUniversalIdentifier:\s*E\.status/.test(kanban)) fail('enquiries-kanban.view.ts does not group by Enquiry.status');
+
+  const icp = await import(pathToFileURL(join(ROOT, 'shared/icp.mjs')).href);
+  const cases = [
+    ['li.wei@acme-battery.cn', 'acme-battery.cn'],
+    ['Someone@QQ.com', null],
+    ['x@163.com', null],
+    ['x@gmail.com', null],
+    ['not-an-email', null],
+  ];
+  const wrong = cases
+    .filter(([email, want]) => icp.companyDomainForEmail(email) !== want)
+    .map(([email, want]) => `${email} → ${icp.companyDomainForEmail(email)} (want ${want})`);
+  const hosts = [
+    ['https://www.acme-battery.cn/en', 'acme-battery.cn', true],
+    ['acme-battery.cn', 'acme-battery.cn', true],
+    ['https://eu.acme-battery.cn', 'acme-battery.cn', true],
+    ['https://notacme-battery.cn', 'acme-battery.cn', false],
+  ];
+  for (const [url, domain, want] of hosts) {
+    if (icp.hostMatchesDomain(url, domain) !== want) wrong.push(`hostMatchesDomain(${url}, ${domain}) !== ${want}`);
+  }
+  if (wrong.length) fail(`shared/icp.mjs: ${wrong.join('; ')}`);
+  else ok(`Enquiry inbox kanban grouped by status from ENQUIRY_STATUS; freemail domains (${icp.FREEMAIL_DOMAINS.length}) never match a Company`);
 }
 
 // ----------------------------------------------------------------- report

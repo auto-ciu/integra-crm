@@ -33,4 +33,8 @@ export const STANDARD = {
       pointOfContact: '20202020-8dfb-42fc-92b6-01afb759ed16',
     },
   },
+  /** Staff seats. Enquiry routing rules assign to a member, not to a Person. */
+  workspaceMember: {
+    object: '20202020-3319-4234-a34c-82d5c0e881a6',
+  },
 } as const;

@@ -17,10 +17,12 @@
     "stages:dry": "node ops/sync-opportunity-stages.mjs --dry-run"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@types/react": "^19.0.0",
     "react": "^19.0.0",
     "twenty-client-sdk": "~2.41.0",
     "twenty-sdk": "~2.41.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "zod": "^4.6.5"
   }
 }

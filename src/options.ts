@@ -115,5 +115,61 @@ export const AUTHORITY_TYPE = options([
   ['OTHER', 'Other', 'gray'],
 ]);
 
+// ------------------------------------------------------------ E1 enquiries
+
+export const ENQUIRY_STATUS = options([
+  ['NEW', 'New · 新', 'blue'],
+  ['OPEN', 'Open · 处理中', 'sky'],
+  ['PENDING', 'Pending · 待回复', 'yellow'],
+  ['CLOSED', 'Closed · 已关闭', 'green'],
+  ['SPAM', 'Spam · 垃圾', 'gray'],
+]);
+
+export const ENQUIRY_PRIORITY = options([
+  ['LOW', 'Low · 低', 'gray'],
+  ['NORMAL', 'Normal · 普通', 'sky'],
+  ['HIGH', 'High · 高', 'orange'],
+  ['URGENT', 'Urgent · 紧急', 'red'],
+]);
+
+/**
+ * Service interest on the contact form = stream codes. A SELECT until Feature
+ * B1's ProductStream object exists; then this becomes a relation.
+ */
+export const ENQUIRY_CATEGORY = options([
+  ['DPP', 'DPP', 'blue'],
+  ['AR', 'EU Representative · 欧代', 'purple'],
+  ['TRAINING', 'Training · 培训', 'green'],
+  ['AUTHORITIES', 'For Authorities · 监管机构', 'turquoise'],
+  ['OTHER', 'Other · 其他', 'gray'],
+]);
+
+/** Same values as Person.language (minus EN_ZH) so intake can copy it across. */
+export const ENQUIRY_LANGUAGE = options([
+  ['EN', 'EN', 'blue'],
+  ['ZH', 'ZH · 中文', 'red'],
+]);
+
+export const ENQUIRY_SOURCE = options([
+  ['WEB_FORM', 'Web form · 网站表单', 'blue'],
+  ['EMAIL', 'Email · 邮件', 'sky'],
+  ['PHONE', 'Phone · 电话', 'turquoise'],
+  ['FAIR', 'Fair · 展会', 'yellow'],
+  ['OTHER', 'Other · 其他', 'gray'],
+]);
+
+/** Turnstile result. UNVERIFIED = widget failed to load (e.g. from mainland China). */
+export const SPAM_CHECK = options([
+  ['VERIFIED', 'Verified · 已验证', 'green'],
+  ['UNVERIFIED', 'Unverified · 未验证', 'yellow'],
+  ['FAILED', 'Failed · 未通过', 'red'],
+]);
+
+export const MESSAGE_DIRECTION = options([
+  ['INBOUND', 'Inbound · 来信', 'blue'],
+  ['OUTBOUND', 'Outbound · 回复', 'green'],
+  ['NOTE', 'Internal note · 内部备注', 'yellow'],
+]);
+
 /** Re-exported so views can import stages from the same module as the rest. */
 export { OPPORTUNITY_STAGES };
