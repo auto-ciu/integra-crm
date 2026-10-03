@@ -1,0 +1,26 @@
+{
+  "name": "@integra/crm-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Integra Scientific CRM — Twenty App (Requirement 4): flywheel data model, views, page layouts, RenewalBanner / RenewalCountWidget front components, nightly urgency script.",
+  "scripts": {
+    "verify": "node verify-model.mjs",
+    "typecheck": "tsc --noEmit -p .",
+    "build": "twenty dev:build",
+    "dev": "twenty dev",
+    "plan": "twenty plan",
+    "deploy": "twenty apply",
+    "nightly": "node ops/nightly-status.mjs",
+    "nightly:dry": "node ops/nightly-status.mjs --dry-run",
+    "stages:sync": "node ops/sync-opportunity-stages.mjs",
+    "stages:dry": "node ops/sync-opportunity-stages.mjs --dry-run"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "twenty-client-sdk": "~2.41.0",
+    "twenty-sdk": "~2.41.0",
+    "typescript": "^5"
+  }
+}
