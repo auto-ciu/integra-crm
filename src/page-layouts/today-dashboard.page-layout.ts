@@ -3,7 +3,8 @@
  * behind it) reached from the sidebar item in ../navigation/today.nav.ts.
  *
  * Grid: 12 columns. RenewalCountWidget on the left, the "Renewals due" table
- * widget on the right so the number and the names are on one screen.
+ * widget on the right so the number and the names are on one screen; the
+ * TicketStatsWidget (E3) sits under the count.
  */
 import {
   definePageLayout,
@@ -56,6 +57,16 @@ export default definePageLayout({
             viewUniversalIdentifier: IDS.views.renewalsDueWidget.view,
           },
           position: grid(0, 5, 8, 7),
+        },
+        {
+          universalIdentifier: L.widgets.ticketStats,
+          title: 'Tickets',
+          type: WidgetType.FRONT_COMPONENT,
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier: IDS.frontComponents.ticketStatsWidget,
+          },
+          position: grid(4, 0, 4, 5),
         },
       ],
     },

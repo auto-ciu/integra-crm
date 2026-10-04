@@ -85,6 +85,8 @@ export const IDS = {
     fields: {
       /** inverse of enquiryRoutingRule.assignTo */
       enquiryRoutingRules: '31d901f7-1e00-47e4-8523-184621a2cfee',
+      /** inverse of enquiry.assignedTo */
+      assignedEnquiries: 'c14a3156-ac29-4096-afee-a5950539fb74',
       /** inverse of pricingPublication.publishedBy */
       pricingPublications: '7d277f8e-daec-4459-9859-8777979dd975',
       /** inverse of leadImport.uploadedBy */
@@ -182,6 +184,16 @@ export const IDS = {
       relatedOpportunity: '97f0dab9-5bd5-414f-839a-a60f51f36e2a',
       /** inverse of enquiryMessage.enquiry */
       messages: 'fad028cd-fd37-432f-a6ba-40613cc61926',
+      // E3 ticket management
+      assignedTo: '33f10eee-c897-4b06-9f32-422f6b876420',
+      tags: '4521b674-8e52-4b33-9120-da47aa83a20f',
+      slaTarget: '1a66f0a6-0bcf-4e82-aed3-c9b0f2af2d69',
+      firstResponseAt: 'abb4be76-001f-4f3f-918e-8c1c0f1f6550',
+      lastActivityAt: '34556b6f-a212-483d-90a1-67dbfa8c76ea',
+      resolution: 'e82eb3ef-67ac-4923-8931-f690b99b66f0',
+      satisfaction: '92de01e2-a834-47c7-a3dd-0b86decadf1a',
+      sourceUrl: '6133786b-1fda-4814-b1d6-96ab54403e48',
+      internalNotes: '06f0706b-25b0-4e6f-8b2d-6df81f28c469',
     },
   },
 
@@ -195,6 +207,35 @@ export const IDS = {
       senderEmail: '4781ae0b-feb0-4bd5-afe3-072bd0633cab',
       sentAt: '51da74cf-2c9f-4af3-8539-77c312014bc5',
       isAutoReply: '2a51f812-7695-451a-8602-2e2fdd5f66d3',
+      /** E3: RFC 5322 Message-ID, the e-mail dedupe and threading key */
+      messageId: 'fdab6df7-f540-46e9-a53a-2b557dff1c42',
+    },
+  },
+
+  // ------------------------------------------------ E3 ticket management
+
+  ticketMacro: {
+    object: '8fd3e352-358d-48c8-b429-9cb64c20c13b',
+    fields: {
+      name: '6f85e0f8-a8c0-438b-bd5b-70c85ba95703',
+      shortcut: 'e4a98388-61fc-4267-bae1-dd3286e3fc1f',
+      responseTemplate: 'e8dafb87-7dc8-4bd8-8bc5-345e617e61da',
+      category: '8f74f9e6-231e-463f-8ece-7af934fe70a7',
+      appendSignature: 'e8021048-8982-4217-bc28-4c1bbade63ba',
+      productCategory: '7c71f082-8fc5-4709-ad72-4b70fb77fbf3',
+      serviceInterest: '82880019-5ae5-43db-8d4a-c0e533cea397',
+    },
+  },
+
+  slaPolicy: {
+    object: 'b31af5e5-06dc-447e-936c-1b0dc8f74877',
+    fields: {
+      name: 'f4419a24-f62d-4763-95cd-a6af07afd99d',
+      description: '31b99687-cff7-4434-8bfd-8a5c24a5056f',
+      priority: '79bbacbf-d2e7-44a4-96d2-8ce84d020630',
+      firstResponseHours: 'f5d401af-74a3-4aea-a7b0-58c80a73f879',
+      resolutionHours: 'bb1e1fa8-03e6-491c-ad7b-e20bd6022848',
+      isActive: '49de3676-93f2-40ab-88bd-65b592200d0d',
     },
   },
 
@@ -838,6 +879,66 @@ export const IDS = {
       ],
       sort: 'a204a1d4-131e-4d7f-affe-a5f338a51e83',
     },
+    staffTicketInbox: {
+      view: '08d8cb76-79d1-437e-8aaa-449070535e55',
+      fields: [
+        '2b05b426-e402-4852-860a-f6cc4bc56702',
+        '830fc434-a92c-47af-af8d-ae4e7473b284',
+        'c896abfc-6939-4a7d-a1f5-08271387c1bf',
+        'f120efdd-7a01-48d6-a031-4e94ae81776a',
+        '1b9213b2-9228-4946-9310-7ba798db3dd8',
+        'f823d337-8898-45ed-bab5-4c80da95e005',
+        '8cf28806-3502-4110-953c-734864c539b3',
+        '0534627c-b580-4068-9ec7-93aa665a9d1a',
+      ],
+      filters: ['05a14d78-868b-4da4-a185-678d01cdf301'],
+      sorts: ['126ce798-52cf-48ea-a433-f74862e2d837', '5ef1d586-d29e-40eb-8b24-986192b634bd'],
+    },
+    myTickets: {
+      view: '5df9f44d-a299-459b-81e8-fc9e7296b1c0',
+      fields: [
+        '469a4b57-42b8-43f2-8fea-b25c550aecd8',
+        'a498c1a3-6a1d-47f9-8134-a4e46e5525ae',
+        'b6ec52e4-8312-44ed-bf0c-026ed77bb189',
+        'e8c35f03-6aee-44be-95c8-a38494fdf457',
+        'c894c29e-5585-4393-bc86-ee0f99d5e4b0',
+        '2e4186d5-6e95-4d18-8989-e8945620f21e',
+        '233b1d1e-739d-45f8-a339-4ce0dba6e79f',
+        'dc6ad7f0-5aff-48ca-b9a5-8ee8b8bdd26f',
+      ],
+      filters: ['0fecf39f-f23b-44a9-aa9e-cd360d4c4141', 'f4b95d77-8b3b-4b5d-b7d7-016196aaec9a'],
+      sorts: ['e540f803-dd33-41df-8656-57350a62f7d0', 'cbe12d4d-1b38-40bc-92fa-880136bc63fd'],
+    },
+    overdueTickets: {
+      view: 'fec68190-0203-4938-a24a-aa5e9a0bca12',
+      fields: [
+        '2dbc3f00-4ce2-4fa2-88b6-97b78047e298',
+        '9577974f-24a4-4276-864d-7056ae190e51',
+        '2f9ff054-2fd0-4ba4-978a-a9ecdbd2dd5c',
+        '1b2e8626-c692-46ab-8761-320c99028c44',
+        '64f5921e-7427-404f-8c7c-4066b66a0dd8',
+        '7f3fb5f0-3899-42ab-ba75-0661b3bd6e36',
+        '5798bc7d-eea6-4a40-884b-133ad7192f04',
+        '0691ef7e-4b54-402b-a63f-a723552c85a2',
+      ],
+      filters: ['af890781-8959-4201-8e34-db6e13c1b554', 'faf9b080-43ba-445b-8c96-7cc084388765'],
+      sort: '34bce7da-563e-41fa-bb30-b4a5bbc4dda0',
+    },
+    enquiryTicketFields: {
+      view: '6eaebb9c-1caa-4697-94df-b36b89db288a',
+      fields: [
+        '29804789-8846-461b-b7d5-d75d087c56f2',
+        '36cc4350-a947-42a5-83bb-ee27cdbefb52',
+        'b7b37701-69d6-4172-990e-650a005735e1',
+        'ed48ba8d-f1de-49b9-947e-b592080dd1e6',
+        '6a8585f0-980a-40ae-be63-568b05f4efeb',
+        '4f1dfb9a-9bd4-4a16-b48b-1846350afbf7',
+        '1d779810-3800-4e54-a866-2144d18229f2',
+        '34a517ce-e5a6-490b-b264-b8703b269942',
+        '83f4f090-7a99-4c9f-8e99-5eb9f6821d12',
+        '56b96a06-5342-42e7-99b4-8579306d57eb',
+      ],
+    },
     streamsList: {
       view: '9dfc61d6-2ab5-4025-a0d0-e6f6b0f99e6d',
       fields: [
@@ -1239,6 +1340,9 @@ export const IDS = {
     pricingDisplay: 'c62acce9-9a0d-441b-a6d7-46604fc14f0a',
     registerForTrainingButton: '453e813e-efe6-4f54-91ae-d83592da0768',
     validateDiscountsButton: 'bac60b1d-aa63-4d85-be99-e963651539b3',
+    ticketStatsWidget: '28295cc6-517e-4c74-9547-ad6184b38cf8',
+    enquiryActionsBar: 'b9bdcc0f-3a96-4056-b179-983ace070488',
+    applyMacroPanel: 'b33c1b92-30f5-4402-9cbc-46cf3d8f9807',
   },
 
   pageLayouts: {
@@ -1267,20 +1371,24 @@ export const IDS = {
       widgets: {
         renewalCount: '5f607182-0201-4eef-ba05-162738495a6b',
         renewalsDue: '5f607182-0202-4ff0-8b16-2738495a6b7c',
+        ticketStats: 'b9e0e6c6-d324-42f6-b474-942cbd3133f2',
       },
     },
     enquiryRecord: {
       layout: '82cd5400-83e7-4177-8153-917828d21b9f',
       tabs: {
         messages: '2c7f88e2-8a82-431f-aa2d-be7583f0010f',
-        requester: '504014c9-fb52-43f1-b44f-302eb1141676',
-        triage: '5ab6db8b-c617-4537-9e86-a91c1eeb95e2',
+        details: '05876b2f-0561-4e55-b21b-4a7d4838dd1a',
+        macros: 'cd496e9e-919f-44d5-a463-17065efa51bc',
       },
       widgets: {
         requesterFields: '4c7fab12-15d9-40d7-886d-3c6a8413bef2',
         promoteToLead: 'af57d0a0-d82e-4ee6-a905-406dfdb62906',
         messages: 'f882ebbc-8d90-49cc-9a0a-7eced3b7c297',
         triageFields: '43bc2bc2-0b80-4200-89cd-5d0d34be67ba',
+        ticketFields: 'e6802343-85a4-4da2-93c0-0892bb6b21d5',
+        actionsBar: 'f133edda-1d51-4252-8446-33616af2ec88',
+        applyMacro: '7b192110-bdce-47a5-aebb-2aa6a0f21717',
       },
     },
     productStreamRecord: {
@@ -1379,6 +1487,9 @@ export const IDS = {
     leadDiscovery: 'b85ea1d6-f8cd-460c-8491-5e66a540c065',
     portalEvents: '9c08b4b3-230b-40be-b966-d41c742efef5',
     marketResearch: '67888fed-5e50-4f6e-aaf8-f4ca4e4c3014',
+    staffTicketInbox: 'ee15a1a7-d39a-4fae-afec-8445371dd516',
+    myTickets: '0bed0e7f-7b96-4c01-b75f-beb07db316e3',
+    overdueTickets: '48f64f06-e3fe-44de-80b4-02eea4462b91',
   },
 
   logicFunctions: {

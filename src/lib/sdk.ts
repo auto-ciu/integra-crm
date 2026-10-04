@@ -23,6 +23,7 @@ export {
   defineLogicFunction,
   getFieldUniversalIdentifier,
   FieldType,
+  DateDisplayFormat,
   RelationType,
   AggregateOperations,
   ViewType,

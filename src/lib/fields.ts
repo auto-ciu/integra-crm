@@ -3,7 +3,7 @@
  * schema, not like JSON. Every helper returns the plain manifest shape that
  * both `defineObject({ fields: [...] })` and `defineField({...})` accept.
  */
-import { FieldType, RelationType } from './sdk';
+import { DateDisplayFormat, FieldType, RelationType } from './sdk';
 
 /** Twenty's option-pill palette (the SDK's TAG_COLORS; the type is not exported). */
 export type TagColor =
@@ -61,10 +61,12 @@ export const date = (f: Base) => ({
   isNullable: true as const,
 });
 
-export const dateTime = (f: Base) => ({
+/** `relative` shows "3 hours ago" / "in 2 days" instead of a timestamp. */
+export const dateTime = ({ relative = false, ...f }: Base & { relative?: boolean }) => ({
   ...f,
   type: FieldType.DATE_TIME as const,
   isNullable: true as const,
+  ...(relative ? { universalSettings: { displayFormat: DateDisplayFormat.RELATIVE } } : {}),
 });
 
 export const boolean = ({ defaultValue = false, ...f }: Base & { defaultValue?: boolean }) => ({

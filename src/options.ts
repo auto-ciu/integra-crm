@@ -184,6 +184,21 @@ export const MESSAGE_DIRECTION = options([
   ['NOTE', 'Internal note · 内部备注', 'yellow'],
 ]);
 
+// ------------------------------------------------- E3 ticket management
+
+export const TICKET_SATISFACTION = options([
+  ['NONE', 'None · 无', 'gray'],
+  ['GOOD', 'Good · 满意', 'green'],
+  ['NEUTRAL', 'Neutral · 一般', 'yellow'],
+  ['BAD', 'Bad · 不满意', 'red'],
+]);
+
+export const MACRO_CATEGORY = options([
+  ['RESPONSE', 'Response · 回复', 'blue'],
+  ['INTERNAL_ACTION', 'Internal action · 内部操作', 'orange'],
+  ['BOTH', 'Both · 两者', 'purple'],
+]);
+
 // ------------------------------------------------------ E2 reply templates
 
 /** ENQUIRY_CATEGORY plus ALL, the catch-all (shared/reply-templates.mjs). */
