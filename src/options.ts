@@ -255,3 +255,27 @@ export const PRICE_CURRENCY = fromShared(CURRENCIES);
 
 /** Re-exported so views can import stages from the same module as the rest. */
 export { OPPORTUNITY_STAGES };
+
+// ------------------------------------------------- A2 LinkedIn lead discovery
+
+export const DISCOVERY_RUN_STATUS = options([
+  ['QUEUED', 'Queued · 排队中', 'gray'],
+  ['RUNNING', 'Running · 运行中', 'sky'],
+  ['COMPLETED', 'Completed · 已完成', 'green'],
+  ['FAILED', 'Failed · 失败', 'red'],
+]);
+
+/** Where a discovery run's companies come from (only Apify's LinkedIn company actor so far). */
+export const DISCOVERY_SOURCE = options([
+  ['APIFY_LINKEDIN', 'LinkedIn via Apify', 'blue'],
+]);
+
+// ----------------------------------------------- X5 training registration
+
+export const TRAINING_REGISTRATION_STATUS = options([
+  ['REGISTERED', 'Registered · 已报名', 'sky'],
+  ['CONFIRMED', 'Confirmed · 已确认', 'blue'],
+  ['ATTENDED', 'Attended · 已参加', 'green'],
+  ['CANCELLED', 'Cancelled · 已取消', 'gray'],
+  ['NO_SHOW', 'No-show · 未出席', 'red'],
+]);

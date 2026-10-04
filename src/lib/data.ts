@@ -5,9 +5,9 @@
  * `twenty-client-sdk/core`). The published package ships a stub whose
  * `query` is `any`; `twenty dev` / `twenty dev:build` regenerates it from the
  * workspace schema, after which these selections are type-checked against the
- * real `arMandate(s)` / `pricingStrategy` / `priceItems` resolvers. The
- * components only see the functions below and render a graceful fallback on
- * any error.
+ * real `arMandate(s)` / `pricingStrategy` / `priceItems` / `trainingEvent` /
+ * `people` / `trainingRegistrations` resolvers. The components only see
+ * the functions below and render a graceful fallback on any error.
  */
 import { CoreApiClient } from 'twenty-client-sdk/core';
 
@@ -126,4 +126,52 @@ export async function fetchPricingStrategy(
     strategy: (pricingStrategy ?? null) as PricingStrategyRecord | null,
     items: ((priceItems?.edges ?? []) as Array<{ node: PriceItemRecord }>).map((edge) => edge.node),
   };
+}
+
+// ------------------------------------------------- X5 training registration
+
+export type TrainingEventRecord = { id: string; name: string | null; date: string | null; location: string | null };
+
+export type PersonRecord = {
+  id: string;
+  name: { firstName: string | null; lastName: string | null } | null;
+  companyId: string | null;
+};
+
+export async function fetchTrainingEvent(recordId: string): Promise<TrainingEventRecord | null> {
+  const { trainingEvent } = await new CoreApiClient().query({
+    trainingEvent: {
+      __args: { filter: { id: { eq: recordId } } },
+      id: true,
+      name: true,
+      date: true,
+      location: true,
+    },
+  });
+  return (trainingEvent ?? null) as TrainingEventRecord | null;
+}
+
+/** The Person whose primary e-mail is `email` (case as stored), or null. */
+export async function findPersonByEmail(email: string): Promise<PersonRecord | null> {
+  const { people } = await new CoreApiClient().query({
+    people: {
+      __args: { filter: { emails: { primaryEmail: { eq: email } } }, first: 1 },
+      edges: { node: { id: true, name: { firstName: true, lastName: true }, companyId: true } },
+    },
+  });
+  return ((people?.edges ?? []) as Array<{ node: PersonRecord }>)[0]?.node ?? null;
+}
+
+/** Id of the person's registration for the event that is not CANCELLED, or null. */
+export async function findActiveRegistration(trainingEventId: string, personId: string): Promise<string | null> {
+  const { trainingRegistrations } = await new CoreApiClient().query({
+    trainingRegistrations: {
+      __args: {
+        filter: { trainingEventId: { eq: trainingEventId }, personId: { eq: personId }, status: { neq: 'CANCELLED' } },
+        first: 1,
+      },
+      edges: { node: { id: true } },
+    },
+  });
+  return ((trainingRegistrations?.edges ?? []) as Array<{ node: { id: string } }>)[0]?.node.id ?? null;
 }

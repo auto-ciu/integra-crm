@@ -18,18 +18,23 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/objects/{company,person,opportunity,workspace-member}/*.field.ts   standard-object extensions (defineField)
 ├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule,
 │                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead,
-│                                    PricingStrategy, PriceItem, ReplyTemplate
+│                                    PricingStrategy, PriceItem, ReplyTemplate, LeadDiscoveryRun, DiscoveredCompany,
+│                                    TrainingRegistration
 ├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban,
-│                                    Product Streams table, Pricing Strategies + Price Items tables, Reply Templates table, widgets
+│                                    Product Streams table, Pricing Strategies + Price Items tables, Reply Templates table,
+│                                    Lead Discovery + Discovered Companies tables, Training Registrations table, widgets
 ├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs),
-│                                    Pricing Strategy record page (2 tabs), Today (standalone)
-├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub), PricingDisplay (stub)
-├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams, Pricing
+│                                    Pricing Strategy record page (2 tabs), Training Event record page (2 tabs), Today (standalone)
+├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub), PricingDisplay (stub),
+│                                    RegisterForTrainingButton (stub)
+├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams, Pricing,
+│                                    Lead Discovery
 ├── src/logic-functions/             F0.3 spike: health-check (httpRoute), company-created (databaseEvent), daily-heartbeat (cron)
 ├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub), fair-lead-intake,
 │                                    score-fair-lead (A1 stub), send-auto-reply (E2), generate-stream-digest (B2),
-│                                    renewals-check, send-renewal-notifications (stub); lib/sidecar.ts shared HTTP + CRM
-│                                    helpers. Not app entities
+│                                    renewals-check, send-renewal-notifications (stub), run-linkedin-discovery, apify-webhook,
+│                                    score-discovered-company, promote-discovered-company (A2), register-for-training (X5);
+│                                    lib/sidecar.ts shared HTTP + CRM helpers, lib/discovery.ts Apify client. Not app entities
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
 ├── shared/urgency.mjs               renewal maths shared by widgets and renewals-check (planMandate)
 ├── shared/reply-templates.mjs       E2: the ten seed templates, template choice (fallback order) and rendering
@@ -38,6 +43,8 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── shared/streams.mjs               the nine product streams, one per PRODUCT_CATEGORY (seed + verify read this)
 ├── shared/scoring.mjs               fair-lead score rules (A1 stub; score-fair-lead + verify read this)
 ├── shared/pricing.mjs               C1 pricing: option sets, D3 display rules, canonical strategies, pricing.json transform
+├── shared/lead-discovery.mjs        A2: Apify actor pin, cost estimate + caps, guardrails, item mapping, discovery score rules
+├── shared/training.mjs              X5: the three seed training events, event-passed + registration rules
 ├── ops/lib/twenty-api.{mjs,ts}      REST/metadata client (ops scripts; .ts port for the sidecar)
 ├── ops/lib/sidecar.mjs              client for the ops-invoked sidecar functions (SIDECAR_URL, OPS_TOKEN)
 ├── ops/nightly-status.mjs           CLI over renewals-check: urgency/status recompute (idempotent, --dry-run)
@@ -47,6 +54,8 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
 ├── ops/seed-pricing.mjs             creates missing strategies + price items from shared/pricing.mjs, recounts itemCount
 ├── ops/publish-pricing.mjs          live pricing → pricing.json for the website (read-only; .github/workflows/publish-pricing.yml)
+├── ops/discover-leads.mjs           A2: start an Apify LinkedIn company run via run-linkedin-discovery (--dry-run, --wait)
+├── ops/seed-training-events.mjs     creates missing TrainingEvent records from shared/training.mjs (--dry-run)
 ├── docs/logic-function-spike.md     F0.3 findings: what logic functions can do on 2.41, and the decision
 └── verify-model.mjs                 dependency-free static check (npm run verify)
 ```
@@ -78,19 +87,23 @@ TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:dry  # t
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:publish  # writes ./pricing.json
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run replies:dry  # then replies:seed
 TWENTY_API_URL=… TWENTY_API_KEY=… SIDECAR_URL=… OPS_TOKEN=… npm run digests:dry  # then digests (weekly cron)
+TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run training:dry  # then training:seed
+npm run discover:dry -- --config=leads.json                                # cost + query preview, no network
+SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --config=leads.json --wait
 ```
 
 ## Model
 
 | Object | Kind | Fields added |
 | --- | --- | --- |
-| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents, enquiries, fairLeads inverses) |
-| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus (+ enquiries, fairLeads, streamContacts inverses) |
+| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents, enquiries, fairLeads, trainingRegistrations inverses) |
+| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus (+ enquiries, fairLeads, streamContacts, trainingRegistrations inverses) |
 | Opportunity | extend | productLine, tier, leadSource (fair name, text) (+ enquiries inverse); stage set replaced by `ops/sync-opportunity-stages.mjs` |
 | WorkspaceMember | extend | enquiryRoutingRules inverse (unverified on a live server, see below) |
 | AR Mandate | new | company→, status, startDate, endDate, renewalDate, docusignEnvelopeId, annualFee (EUR), signatory, urgency (computed), documents (files), products |
 | Mandate Product | new | arMandate→, productName, category, dppStatus |
-| Training Event | new | title (`name`), date, channel, attendeeCount, company→ |
+| Training Event | new | title (`name`), date, channel, attendeeCount, company→, language, location, registrations |
+| Training Registration | new | name (event — person), trainingEvent→, person→, company→, status, registrationDate, confirmationSentAt, notes, dietaryRequirements, certificateIssued, certificateUrl |
 | Authority | new | name, authorityType, country, notes |
 | Enquiry | new | reference (unique, label), intakeId (unique), status, priority, category, subject, language, source, sourcePage, utmSource/Medium/Campaign, spamCheck, triageNotes, closedAt, relatedCompany→, relatedPerson→, relatedOpportunity→, messages |
 | Enquiry Message | new | name, enquiry→, direction, body, senderEmail, sentAt, isAutoReply |
@@ -103,6 +116,8 @@ TWENTY_API_URL=… TWENTY_API_KEY=… SIDECAR_URL=… OPS_TOKEN=… npm run dige
 | Pricing Strategy | new | name, correlationId (unique), strategyType, description, isActive, validFrom, validUntil, displayMode, sortOrder, itemCount (denormalised, recounted by `pricing:seed`), items |
 | Price Item | new | name, strategy→, productLine, tier, description, annualFeeEur, setupFeeEur, currencyCode, isHighlighted, isOnRequest, sortOrder, correlationId (unique) |
 | Reply Template | new | name, category (ENQUIRY_CATEGORY + ALL), language (EN/ZH/ALL), subject, body, isActive, sortOrder |
+| Lead Discovery Run | new | name, status, source, query (JSON + actor build), resultsCount, resultsNew, costUsd, runId (unique, Apify), startedAt, completedAt, errorMessage, discoveredCompanies |
+| Discovered Company | new | discoveryRun→, companyName (label), companyNameZh, website, linkedinUrl, industry, companySize, headquarters, productCategories (multi), description, emailDomains, isExportedToCRM, exportedCompanyId, isDuplicate, score, scoreBreakdown |
 
 Urgency windows (days to `renewalDate`): **None** > 180 · **Watch** 90–180 ·
 **Due** < 90 · **Overdue** < 0. `Active` flips to `Expiring` inside 90 days,
@@ -120,6 +135,21 @@ no amounts for on-request items or hidden strategies. It goes to
 integrascientific/integra-scientific by hand, since that repo is under another
 GitHub account. The "Publish pricing" workflow uploads it as an artifact; the
 steps are in `ops/publish-pricing.mjs`.
+
+LinkedIn lead discovery (A2): `npm run discover` asks the
+`run-linkedin-discovery` sidecar to start Apify's `harvestapi/linkedin-company`
+(build pinned in `shared/lead-discovery.mjs`) for a list of company names
+and/or LinkedIn company URLs. Apify's webhook (or `--wait`) then calls
+`apify-webhook`, which imports one Discovered Company per company page that
+has a website, scores it, and flags pages already found by an earlier run or
+already on a CRM Company. `promote-discovered-company` turns one into a CRM
+Company. The plan's guardrails are code: company-page actor only (a person's
+`/in/` URL is refused on the way in and dropped on the way out), no cookies,
+the actor build and run on every record, `APIFY_ENABLED=true` or nothing runs,
+and a per-run spend limit (worst case at $4/1k companies, max $5 per run)
+that Apify also enforces as `maxTotalChargeUsd`. Keep a monthly cap in the
+Apify console too. `emailDomains` is not filled from LinkedIn; staff (or the
+later website enrichment) add it, then re-score.
 
 ## e2e contracts (crm/e2e/journey.spec.ts)
 
@@ -149,9 +179,9 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
   navigation shapes, `defineFrontComponent` (from `twenty-sdk/define`) and
   `useRecordId` (from `twenty-sdk/front-component`).
 - `npm run build` (`twenty dev:build`) succeeds with no warnings and the
-  manifest holds every entity: 15 objects, 24 standard-object fields, 21 views,
-  4 front components, 5 page layouts, 7 navigation items, 3 logic functions,
-  1 role.
+  manifest holds every entity: 18 objects, 26 standard-object fields, 26 views,
+  5 front components, 6 page layouts, 8 navigation items, 3 logic functions,
+  1 role, 2 application variables.
 - `src/standard-ids.ts` matches the SDK's `STANDARD_OBJECT` constants.
 
 **Not** verified — these need a running Twenty (`npm run dev` against
@@ -207,7 +237,29 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      cited research is Feature D.
    - `send-auto-reply` records the reply (OUTBOUND, isAutoReply, sentAt
      empty) but sends nothing: `sent` is false until SES is wired.
-8. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
+8. Wave 3 (A2 / X5):
+   - Apify calls: the run, webhook and dataset endpoints and the item shape
+     follow Apify's API docs and the actor's published output example (build
+     0.0.44); no live Apify run has been made. `apify-webhook` reads only the
+     run id from the payload and re-reads status, cost and results from
+     Apify.
+   - `apify-webhook` needs its own route and bearer (`APIFY_WEBHOOK_TOKEN`,
+     sent by Apify through the webhook's headers template). Set
+     `APIFY_WEBHOOK_URL` on `run-linkedin-discovery` once that route exists;
+     until then use `discover-leads --wait`.
+   - DiscoveredCompany de-duplication filters on
+     `linkedinUrl.primaryLinkUrl[eq]` (REST filter on a LINKS sub-field).
+   - The Training Event record page's Registrations table (`RECORD_TABLE`)
+     has the same scoping question as item 3.
+   - RegisterForTrainingButton calls the sidecar from the browser:
+     `SIDECAR_URL` and `REGISTRATION_TOKEN` are app variables (readable by
+     every CRM user, hence a register-only token), and API Gateway's CORS
+     settings must allow the Twenty origin. Whether `fetch` is allowed from
+     the front-component sandbox is unconfirmed. An authenticated
+     logic-function route is the better home once logic functions run.
+   - The `trainingEvent` / `people` / `trainingRegistrations` queries in
+     `src/lib/data.ts` have the same generated-client caveat as item 1.
+9. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
    `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
    also need cron registration on the worker. See
    `docs/logic-function-spike.md`.

@@ -1,13 +1,14 @@
 /**
  * Training Event — the low-trust entry point of the flywheel (webinars,
- * Canton Fair sessions, on-site training). Many-to-one to Company is enough
- * for now; attendee-level registration is a later requirement.
+ * Canton Fair sessions, on-site training). Attendees sign up as Training
+ * Registrations (X5); `language` and `location` say who the event is for and
+ * where it happens (ops/seed-training-events.mjs).
  */
 import { defineObject } from '../lib/sdk';
-import { date, manyToOne, number, select, text } from '../lib/fields';
+import { date, manyToOne, number, oneToMany, select, text } from '../lib/fields';
 import { IDS } from '../ids';
 import { STANDARD } from '../standard-ids';
-import { TRAINING_CHANNEL } from '../options';
+import { LANGUAGE, TRAINING_CHANNEL } from '../options';
 
 const F = IDS.trainingEvent.fields;
 
@@ -56,6 +57,28 @@ export default defineObject({
       icon: 'IconBuildingSkyscraper',
       targetObjectId: STANDARD.company.object,
       inverseFieldId: IDS.company.fields.trainingEvents,
+    }),
+    select({
+      universalIdentifier: F.language,
+      name: 'language',
+      label: 'Language · 语言',
+      icon: 'IconLanguage',
+      options: LANGUAGE,
+    }),
+    text({
+      universalIdentifier: F.location,
+      name: 'location',
+      label: 'Location · 地点',
+      icon: 'IconMapPin',
+      description: '"Online", or the city',
+    }),
+    oneToMany({
+      universalIdentifier: F.registrations,
+      name: 'registrations',
+      label: 'Registrations · 报名',
+      icon: 'IconTicket',
+      targetObjectId: IDS.trainingRegistration.object,
+      inverseFieldId: IDS.trainingRegistration.fields.trainingEvent,
     }),
   ],
 });

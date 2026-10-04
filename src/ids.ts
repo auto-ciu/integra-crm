@@ -11,6 +11,12 @@ export const IDS = {
   /** The application's default role (what the app token runs as). */
   appRole: '19d4fc6f-74fd-4b09-a749-7462f1176287',
 
+  /** App variables (src/index.ts), read by front components. */
+  applicationVariables: {
+    sidecarUrl: 'bb4f84fe-1f4f-4655-83d8-b0498e6e48ad',
+    registrationToken: 'b3cb7d1c-83ad-464c-a2e9-44dba968df49',
+  },
+
   company: {
     fields: {
       nameZh: 'c0a1f2d3-11e4-4a5b-8c6d-7e8f9a0b1c2d',
@@ -27,6 +33,8 @@ export const IDS = {
       enquiries: '009dc9ed-35ba-4ae7-952c-601646de1a5c',
       /** inverse of fairLead.company */
       fairLeads: '9e48010c-03a2-41b2-ae5b-f6495207294e',
+      /** inverse of trainingRegistration.company */
+      trainingRegistrations: '310c403f-499f-4228-9acd-57cf73e3351b',
     },
   },
 
@@ -44,6 +52,8 @@ export const IDS = {
       fairLeads: '92c347a1-dec4-4fa5-b940-3317c76dc7c4',
       /** inverse of streamContact.person */
       streamContacts: '2e1800e4-f142-46a7-9f1b-46ef4f191408',
+      /** inverse of trainingRegistration.person */
+      trainingRegistrations: 'ffd839c7-84c1-4870-8462-28f7d3d5d6c0',
     },
   },
 
@@ -103,6 +113,10 @@ export const IDS = {
       channel: 'c6d7e8f9-0004-45a6-a17c-8d9eafb0c1d2',
       attendeeCount: 'c6d7e8f9-0005-46a7-b28d-9eafb0c1d2e3',
       company: 'c6d7e8f9-0006-47a8-839e-afb0c1d2e3f4',
+      language: 'f856755b-32f4-4efd-b1d6-221045625c24',
+      location: '045bfcba-55de-4e73-a348-710f327596eb',
+      /** inverse of trainingRegistration.trainingEvent */
+      registrations: 'fc3c81d4-3bff-426d-864a-8377d381e0da',
     },
   },
 
@@ -294,6 +308,69 @@ export const IDS = {
       body: 'cc3c117e-7f4c-466c-95a6-97cdf6356d7c',
       isActive: '1d1b5db1-f3cc-4637-b573-161aa67b7a41',
       sortOrder: '9654c1d7-aa17-41ed-9c5e-4c6a9725562c',
+    },
+  },
+
+  // --------------------------------------------- A2 LinkedIn lead discovery
+
+  /** One Apify actor run (harvestapi/linkedin-company). */
+  leadDiscoveryRun: {
+    object: 'ea47faee-1ca9-42f6-ae33-087b0fc69aa2',
+    fields: {
+      name: '26211887-f323-444a-bdce-3ba03897abad',
+      status: 'e375dde3-a19a-4030-a7e9-0b7516d3b7b3',
+      source: '4c377b1c-9765-414b-93ab-103f8d12297a',
+      query: '361efceb-3f51-4d14-82db-4d798b9fd0f0',
+      resultsCount: '834ab41e-2fd2-474f-9107-4bae1dd1787b',
+      resultsNew: '7643254d-9e85-4fdc-8f97-c8ad859b3c08',
+      costUsd: '1956f0b0-bb1f-4f2e-a2dc-f4d14c018b76',
+      runId: '5d9963f5-c4bf-4a51-8427-94f94dd11272',
+      startedAt: '5ebd3006-a4c3-4a30-b403-2f8893f9a7bd',
+      completedAt: 'ad5a1781-f585-4f14-a31f-e724aa1901d2',
+      errorMessage: 'c8f5e353-e586-4161-8453-21317fea2dd2',
+      /** inverse of discoveredCompany.discoveryRun */
+      discoveredCompanies: 'ca198873-0eef-4c99-ba67-99b23bd0eaae',
+    },
+  },
+
+  discoveredCompany: {
+    object: '21e4dd96-32d6-4dd5-b96f-059639532279',
+    fields: {
+      discoveryRun: '8ebc20c5-ac7b-423d-9248-09911d5df800',
+      companyName: 'a5614fda-e88c-4a57-94c7-909710c37d80',
+      companyNameZh: '46e079e0-9680-4872-8880-9c78b57a156a',
+      website: '2fdc3625-7b54-4a5c-8c23-d79dab1c1b43',
+      linkedinUrl: '5eba51cc-91c8-4f50-839d-06704ffe7f39',
+      industry: '72c2aee6-3532-4878-8b7c-a62effc0e8f5',
+      companySize: 'ab5f7549-7268-4b07-b1b5-23249d9b5a48',
+      headquarters: '9983883a-e3f9-4a31-9121-07332045a773',
+      productCategories: '68b5214f-3035-4da9-8587-e69ff4010d54',
+      description: 'aa3baa9d-86d6-4243-b576-d537e585a2b7',
+      emailDomains: '052278a4-4bf1-456b-b4be-6528679b444b',
+      isExportedToCRM: '86f0f546-dbab-4b8c-b764-a57e617f3838',
+      exportedCompanyId: '1405460e-d0f9-4a89-a7b4-4f2c76ad14eb',
+      isDuplicate: '8076b7e3-d86f-41d5-a205-6bd3ebbee9b8',
+      score: '7a6f379c-caa6-4366-9555-f7deaddfb4e7',
+      scoreBreakdown: 'd02918ef-af9a-4eec-a910-0999ef6bc876',
+    },
+  },
+
+  // ------------------------------------------------- X5 training registration
+
+  trainingRegistration: {
+    object: 'd7ea3aa1-b3c0-4002-8c9c-257dd4302195',
+    fields: {
+      name: '25d1e4bc-e3b5-469d-80fc-caf50857733f',
+      trainingEvent: '02b39ee2-6b5a-4884-864d-99f19ea6538a',
+      person: 'a2cdb554-73ce-41a7-9384-6270be475d71',
+      company: '5cdfffa0-b939-4719-ac18-3f7594496208',
+      status: '18b4c5e8-25e9-49cd-b301-4a489d8c2aaa',
+      registrationDate: '8b564c49-7700-45c0-9d22-8a385a8d1314',
+      confirmationSentAt: 'f009b26b-0c2d-4824-adc7-c436d0cf7422',
+      notes: 'cf261217-9dfc-4a15-a4a3-d21f21aa2a73',
+      dietaryRequirements: 'd07ceda4-3937-4617-84c2-b9a4d6c1aca2',
+      certificateIssued: '7c15d680-7657-49f8-8cbb-a92747a98816',
+      certificateUrl: '3566fe9a-9841-4482-9da6-eb52443af2ee',
     },
   },
 
@@ -543,6 +620,62 @@ export const IDS = {
         '944ed5bf-b27e-4eb7-82a9-5953e7a2c1fc',
       ],
       sort: 'a7f69b77-a9d5-4136-a06e-89030942a5d0',
+    },    leadDiscoveryRunsTable: {
+      view: '26a0d67d-a171-461f-8dd1-6b89d3233d91',
+      fields: [
+        '67700238-32f1-4d25-bdd4-3fafdcd91334',
+        '4a55dd50-8954-4800-92c9-de1e09fed3d2',
+        '0612c217-475a-4988-86cd-519bcbe64ab3',
+        '9214c84d-4716-414e-b9ee-011bf77e2e59',
+        '2f1962ea-0775-40f1-b2f6-ca9b33bd53b8',
+        '3e4237d9-8af0-4560-9158-959d2d8ca5ed',
+        '592ac1c0-79a8-4f67-8f4f-df9b260ba2cd',
+      ],
+      sort: 'ddb00f38-925f-47fe-b776-464a24c6baca',
+    },
+    discoveredCompaniesTable: {
+      view: '89cbbb30-9edc-47fb-b651-1a2c3eb68079',
+      fields: [
+        'af534dbb-683a-45e2-ad3a-0c214ee97830',
+        '2cac99af-a8f2-46af-ae21-f14b553f9c4c',
+        'a283ff03-b050-441b-819d-8c8c04a5780b',
+        '5cfbe6e2-b8e9-4bcd-b49b-2956f92fcd38',
+        '59a863d9-7479-4ffa-bcb6-e018ae2c0426',
+      ],
+      sort: '0088517a-8865-4274-b6fd-f6ce4b2b0c23',
+    },
+    trainingRegistrationsTable: {
+      view: 'd4e48721-494b-48ad-844b-35cde8d0f772',
+      fields: [
+        '7c52298c-0e64-4524-bd76-838019c56aff',
+        '97e06ba6-851d-485d-b2c3-b99dcb959ebf',
+        '49eb6145-cdc1-4c82-a2f4-27fbb3e5f377',
+        '1f7cccf2-7b95-4e3a-8ccb-fc98675a9a2c',
+        'e0fcd470-0e98-432a-9851-61242888b928',
+      ],
+      sort: '879abb88-943b-4f3c-8052-aa0db06a59b8',
+    },
+    trainingEventRegistrationsWidget: {
+      view: '1f63e9b8-4f18-4e71-bf83-fbd933eb9a5c',
+      fields: [
+        'c7fc2558-48b9-46e9-8be8-09cd1c2a690a',
+        'b2d3f195-301c-451a-96ce-4b7025a5c108',
+        'c0daba0e-111d-48c4-8395-30f1f302a7e3',
+        'e18dc87e-ab6a-466d-9148-160b54487632',
+        '0a5bf4a0-3575-4446-8d38-ea345a13bf3e',
+      ],
+      sort: '9894b771-13e4-416a-98b3-c628fc5bb021',
+    },
+    trainingEventOverviewFields: {
+      view: 'a66993ac-59df-4385-a342-a6afc59422fd',
+      fields: [
+        'e4092d6c-a8b7-41d0-9f6b-82a600dfee0d',
+        '0454f669-f5e5-4058-98e0-60dfe8950053',
+        'c4dd9d82-5f7a-45f1-9cfa-1a30b97c5e55',
+        '06169218-5e3e-4cd8-8486-b3a07667960f',
+        '6b3da6ef-f3d8-4892-9f70-82fd14d71e84',
+        '49c3ff95-4963-4df6-b15f-13adb0d10026',
+      ],
     },
   },
 
@@ -551,6 +684,7 @@ export const IDS = {
     renewalCountWidget: '3d4e5f60-0002-4edf-ba05-162738495a6b',
     promoteToLeadButton: 'd736dec8-98e6-4e3f-9798-8983c93d700c',
     pricingDisplay: 'c62acce9-9a0d-441b-a6d7-46604fc14f0a',
+    registerForTrainingButton: '453e813e-efe6-4f54-91ae-d83592da0768',
   },
 
   pageLayouts: {
@@ -621,6 +755,17 @@ export const IDS = {
         overviewFields: 'c7f604cd-100e-4d44-8dd2-c23bdce173a0',
         priceItems: 'bb1b5aa1-a790-4496-9495-9ba65c05ce7e',
       },
+    },    trainingEventRecord: {
+      layout: 'e4081265-97fd-41ca-8d02-bc97075dbe18',
+      tabs: {
+        overview: '7e1e627f-7973-48c1-9044-888246a591c3',
+        registrations: 'cee239f0-f623-4396-8116-426daf339d0e',
+      },
+      widgets: {
+        registerButton: 'c796810e-22ad-49ac-8232-18fec4a2c066',
+        overviewFields: 'd9fcef81-6049-4c18-a8a2-716f33983ffe',
+        registrations: 'b3e632d5-c434-4bc3-9a6c-44060066301c',
+      },
     },
   },
 
@@ -632,6 +777,7 @@ export const IDS = {
     enquiries: '0ddf4836-2b27-4fb2-9276-d1658e37714c',
     productStreams: '6fdbe905-ea65-4ee3-af3d-7d7d6e4b72c3',
     pricing: '506d3e76-f244-41e7-a77b-7d1dce1e395f',
+    leadDiscovery: 'b85ea1d6-f8cd-460c-8491-5e66a540c065',
   },
 
   logicFunctions: {
