@@ -33,6 +33,13 @@
  *      ladders (Boss on request, Bundle = DPP + AR less the discount), and
  *      buildPublicPricing publishes only live strategies, only public fields,
  *      and no amounts for on-request items or HIDE strategies.
+ *  13. E2 reply templates: the seed is one template per category × EN/ZH
+ *      (catch-all = ALL), its option values match the ReplyTemplate selects,
+ *      the subject placeholders are only {{reference}}, and selectTemplate
+ *      falls back exact → ALL category → ALL language.
+ *  14. B2 digests + renewals: the per-call worst case keeps a run over every
+ *      stream under the $10 session cap, regulation numbers are recognised,
+ *      and planMandate never flips status on a mandate without a date.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -52,6 +59,7 @@ const EXPECTED_OBJECTS = [
   'Enquiry', 'EnquiryMessage', 'EnquiryRoutingRule',
   'ProductStream', 'StreamUpdate', 'StreamDocument', 'StreamContact', 'FairLead',
   'PricingStrategy', 'PriceItem',
+  'ReplyTemplate',
 ];
 
 const failures = [];
@@ -225,7 +233,10 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
   const line = u.renewalLine('2027-03-14', today);
   if (line !== 'Renews 14 Mar 2027 · 177 days') fail(`renewalLine formatting: "${line}"`);
   if (u.nextStatus('ACTIVE', 'DUE') !== 'EXPIRING' || u.nextStatus('SIGNED', 'DUE') !== 'SIGNED' || u.nextStatus('ACTIVE', 'WATCH') !== 'ACTIVE') {
-    fail('nextStatus: only ACTIVE→EXPIRING inside the 90-day window is allowed');
+    fail('nextStatus: ACTIVE→EXPIRING only inside the 90-day window');
+  }
+  if (u.nextStatus('EXPIRING', 'WATCH') !== 'ACTIVE' || u.nextStatus('EXPIRING', 'OVERDUE') !== 'EXPIRING' || u.nextStatus('LAPSED', 'NONE') !== 'LAPSED') {
+    fail('nextStatus: EXPIRING→ACTIVE only once the renewal date leaves the 90-day window');
   }
   if (!wrong.length) ok(`urgency windows NONE>180 / WATCH 90–180 / DUE<90 / OVERDUE<0 verified; "${line}"`);
 }
@@ -433,6 +444,121 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`C1 pricing: ${problems.join('; ')}`);
   else ok(`C1 pricing: D3 rules for ${types.length} strategy types; ${seed.length}×${tiers.length} seed items (Boss on request, Bundle −${p.BUNDLE_DISCOUNT * 100}%); pricing.json filters live/public/on-request; ${copy.length} display-copy cases`);
+}
+
+// ------------------------------------------------------- 13. E2 reply templates
+{
+  const problems = [];
+  const r = await import(pathToFileURL(join(ROOT, 'shared/reply-templates.mjs')).href);
+  const optionsSource = read('src/options.ts');
+  const optionValues = (name) => {
+    const block = new RegExp(`export const ${name} = options\\(\\[([\\s\\S]*?)\\]\\);`).exec(optionsSource)?.[1] ?? '';
+    return [...block.matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  };
+  const enquiryCategories = optionValues('ENQUIRY_CATEGORY');
+  if (JSON.stringify(optionValues('REPLY_TEMPLATE_CATEGORY')) !== JSON.stringify([...enquiryCategories, 'ALL'])) {
+    problems.push('REPLY_TEMPLATE_CATEGORY must be ENQUIRY_CATEGORY + ALL');
+  }
+  if (JSON.stringify(optionValues('REPLY_TEMPLATE_LANGUAGE')) !== JSON.stringify([...optionValues('ENQUIRY_LANGUAGE'), 'ALL'])) {
+    problems.push('REPLY_TEMPLATE_LANGUAGE must be ENQUIRY_LANGUAGE + ALL');
+  }
+  if (JSON.stringify(r.REPLY_TEMPLATE_CATEGORIES) !== JSON.stringify([...enquiryCategories, 'ALL'])) {
+    problems.push('shared/reply-templates.mjs REPLY_TEMPLATE_CATEGORIES ≠ REPLY_TEMPLATE_CATEGORY');
+  }
+
+  const seed = r.REPLY_TEMPLATES;
+  const names = seed.map((t) => t.name);
+  if (new Set(names).size !== names.length) problems.push('reply template seed: duplicate names');
+  if (seed.length !== 10) problems.push(`reply template seed has ${seed.length} templates, want 10`);
+  const seededCategories = ['DPP', 'AR', 'TRAINING', 'AUTHORITIES', 'ALL'];
+  for (const category of seededCategories) {
+    for (const language of ['EN', 'ZH']) {
+      if (seed.filter((t) => t.category === category && t.language === language).length !== 1) {
+        problems.push(`reply template seed: want exactly one ${category}/${language}`);
+      }
+    }
+  }
+  for (const t of seed) {
+    const used = (text) => [...text.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
+    if (!used(t.subject).includes('reference') || used(t.subject).some((k) => k !== 'reference')) problems.push(`${t.name}: subject must use {{reference}} only`);
+    const unknown = used(t.body).filter((k) => !r.PLACEHOLDERS.includes(k));
+    if (unknown.length) problems.push(`${t.name}: unknown body placeholders ${unknown.join(', ')}`);
+  }
+  // Every enquiry category × language gets a reply in its own language.
+  for (const category of enquiryCategories) {
+    for (const language of ['EN', 'ZH']) {
+      const picked = r.selectTemplate(seed, { category, language });
+      if (!picked || picked.language !== language) problems.push(`no ${language} reply for ${category}`);
+    }
+  }
+
+  // Fallback order: exact → ALL category → ALL language → ALL/ALL; inactive ignored; sortOrder breaks ties.
+  const T = (name, category, language, extra = {}) => ({ id: name, name, category, language, isActive: true, sortOrder: 0, ...extra });
+  const pool = [T('allall', 'ALL', 'ALL'), T('dpp-all', 'DPP', 'ALL'), T('all-zh', 'ALL', 'ZH'), T('dpp-zh', 'DPP', 'ZH'), T('dpp-zh-off', 'DPP', 'ZH', { isActive: false, sortOrder: -1 })];
+  const pick = (templates, category, language) => r.selectTemplate(templates, { category, language })?.id ?? null;
+  const cases = [
+    [pool, 'DPP', 'ZH', 'dpp-zh'],
+    [pool.filter((t) => t.id !== 'dpp-zh'), 'DPP', 'ZH', 'all-zh'],
+    [pool.filter((t) => !['dpp-zh', 'all-zh'].includes(t.id)), 'DPP', 'ZH', 'dpp-all'],
+    [pool, 'AR', 'EN', 'allall'],
+    [[T('ar-en', 'AR', 'EN')], 'DPP', 'EN', null],
+    [[T('b', 'DPP', 'EN', { sortOrder: 2 }), T('a', 'DPP', 'EN', { sortOrder: 1 })], 'DPP', 'EN', 'a'],
+  ];
+  for (const [templates, category, language, want] of cases) {
+    const got = pick(templates, category, language);
+    if (got !== want) problems.push(`selectTemplate(${category}/${language}) = ${got}, want ${want}`);
+  }
+
+  const values = r.templateValues({ reference: 'ENQ-261004-AB2C', name: '  Li\nWei ', company: '', category: 'AR', language: 'ZH' });
+  const rendered = r.renderTemplate('{{name}}|{{company}}|{{category}}|{{reference}}|{{unknown}}', values);
+  if (rendered !== 'Li Wei|贵公司|欧盟授权代表服务|ENQ-261004-AB2C|{{unknown}}') problems.push(`renderTemplate: "${rendered}"`);
+
+  if (problems.length) fail(`E2 reply templates: ${problems.join('; ')}`);
+  else ok(`E2 reply templates: ${seed.length} seeds (${seededCategories.length} categories × EN/ZH, catch-all ALL); every enquiry category answered in its language; ${cases.length} fallback cases; rendering`);
+}
+
+// ------------------------------------------------------ 14. B2 digests + renewals
+{
+  const problems = [];
+  const d = await import(pathToFileURL(join(ROOT, 'shared/digest.mjs')).href);
+  const { PRODUCT_STREAMS } = await import(pathToFileURL(join(ROOT, 'shared/streams.mjs')).href);
+
+  if (d.SESSION_BUDGET_USD !== 10) problems.push(`SESSION_BUDGET_USD is ${d.SESSION_BUDGET_USD}, the plan says $10`);
+  // A full run at the prompt ceiling, every call using all of max_tokens at fallback prices, still fits.
+  const fullRun = PRODUCT_STREAMS.length * d.worstCaseCostUsd(d.DIGEST_MAX_INPUT_TOKENS);
+  if (fullRun > d.SESSION_BUDGET_USD) problems.push(`worst-case run over ${PRODUCT_STREAMS.length} streams is $${fullRun}, over the cap`);
+  if (d.maxInputTokens(d.SESSION_BUDGET_USD) !== d.DIGEST_MAX_INPUT_TOKENS) problems.push('a full budget should allow the prompt ceiling');
+  if (d.maxInputTokens(d.worstCaseCostUsd(0)) !== 0 || d.maxInputTokens(0.5) !== 0) problems.push('maxInputTokens must be 0 when max_tokens alone does not fit');
+  if (d.maxInputTokens(d.worstCaseCostUsd(1000)) !== 1000) problems.push(`maxInputTokens(worstCase(1000)) = ${d.maxInputTokens(d.worstCaseCostUsd(1000))}`);
+  const cost = d.costUsd('claude-opus-5-5', { input_tokens: 1000, output_tokens: 5000 });
+  if (cost !== 0.104) problems.push(`costUsd(opus 5.5, 1k in / 5k out) = ${cost}, want 0.104`);
+  if (d.costUsd('some-future-model', { input_tokens: 1e6, output_tokens: 0 }) !== d.UNKNOWN_MODEL_PRICE.input) problems.push('unknown models must be costed at UNKNOWN_MODEL_PRICE');
+
+  const numbers = [
+    ['Regulation (EU) 2023/1542', '2023/1542'],
+    ['(EC) No 1907/2006', '1907/2006'],
+    ['Directive 2001/95/EC', '2001/95'],
+    ['Regulation (EC) No 765/2008', '765/2008'],
+    ['the Battery Regulation', null],
+    ['', null],
+  ];
+  for (const [text, want] of numbers) if (d.regulationNumber(text) !== want) problems.push(`regulationNumber("${text}") = ${d.regulationNumber(text)}, want ${want}`);
+
+  const u = await import(pathToFileURL(join(ROOT, 'shared/urgency.mjs')).href);
+  const today = new Date('2026-10-04T12:00:00Z');
+  const plans = [
+    [{ status: 'ACTIVE', urgency: 'WATCH', renewalDate: '2026-12-01' }, { urgency: 'DUE', status: 'EXPIRING' }],
+    [{ status: 'EXPIRING', urgency: 'DUE', renewalDate: '2027-09-01' }, { urgency: 'NONE', status: 'ACTIVE' }],
+    [{ status: 'EXPIRING', urgency: 'DUE', renewalDate: null }, { urgency: 'NONE' }],
+    [{ status: 'EXPIRING', urgency: 'OVERDUE', renewalDate: '2026-10-01' }, {}],
+  ];
+  for (const [mandate, want] of plans) {
+    const { patch } = u.planMandate(mandate, today);
+    if (JSON.stringify(patch) !== JSON.stringify(want)) problems.push(`planMandate(${JSON.stringify(mandate)}) patch ${JSON.stringify(patch)}, want ${JSON.stringify(want)}`);
+  }
+
+  if (problems.length) fail(`B2/renewals: ${problems.join('; ')}`);
+  else ok(`B2 digests: worst-case run over ${PRODUCT_STREAMS.length} streams $${fullRun.toFixed(2)} ≤ $${d.SESSION_BUDGET_USD} cap; ${numbers.length} regulation-number cases. Renewals: ${plans.length} planMandate cases`);
 }
 
 // ----------------------------------------------------------------- report

@@ -1,7 +1,8 @@
 /**
  * Renewal urgency — the one piece of business logic shared by the
  * RenewalBanner / RenewalCountWidget front components (TS, bundled) and the
- * nightly ops script (plain node). Keep it dependency-free and pure.
+ * renewals-check sidecar function that ops/nightly-status.mjs drives. Keep it
+ * dependency-free and pure.
  *
  * Windows (days until renewalDate, measured in whole UTC days):
  *   OVERDUE  days < 0
@@ -74,18 +75,39 @@ export function urgencyForDate(isoDate, today = new Date()) {
 }
 
 /**
- * Status transition the nightly job is allowed to make: an ACTIVE mandate
- * inside the 90-day window becomes EXPIRING. Nothing else is touched (a
- * human decides Signed→Active, Expiring→Lapsed, etc.).
+ * Status transitions the nightly job is allowed to make:
+ *   ACTIVE   → EXPIRING  inside the 90-day window (DUE / OVERDUE);
+ *   EXPIRING → ACTIVE    once the renewal date has been extended past it
+ *                        (WATCH / NONE).
+ * Nothing else is touched (a human decides Signed→Active, Expiring→Lapsed,
+ * etc.). See planMandate for the missing-date guard.
  */
 export function nextStatus(currentStatus, urgency) {
-  if (
-    currentStatus === MANDATE_STATUS.ACTIVE &&
-    (urgency === URGENCY.DUE || urgency === URGENCY.OVERDUE)
-  ) {
-    return MANDATE_STATUS.EXPIRING;
-  }
+  const inWindow = urgency === URGENCY.DUE || urgency === URGENCY.OVERDUE;
+  if (currentStatus === MANDATE_STATUS.ACTIVE && inWindow) return MANDATE_STATUS.EXPIRING;
+  if (currentStatus === MANDATE_STATUS.EXPIRING && !inWindow) return MANDATE_STATUS.ACTIVE;
   return currentStatus;
+}
+
+/** Statuses the renewals job checks: the mandates that are in force. */
+export const LIVE_MANDATE_STATUSES = Object.freeze([MANDATE_STATUS.ACTIVE, MANDATE_STATUS.EXPIRING]);
+
+/**
+ * What one mandate should become: `{ days, urgency, status, patch }`, where
+ * `patch` holds only the fields that change (empty → nothing to write).
+ * A mandate without a renewal date gets urgency NONE but keeps its status,
+ * so clearing the date never flips EXPIRING back to ACTIVE.
+ */
+export function planMandate(mandate, today = new Date()) {
+  const days = daysUntil(mandate.renewalDate, today);
+  const urgency = urgencyForDays(days);
+  const currentUrgency = mandate.urgency ?? URGENCY.NONE;
+  const currentStatus = mandate.status ?? MANDATE_STATUS.DRAFT;
+  const status = days === null ? currentStatus : nextStatus(currentStatus, urgency);
+  const patch = {};
+  if (urgency !== currentUrgency) patch.urgency = urgency;
+  if (status !== currentStatus) patch.status = status;
+  return { days, urgency, status, from: { urgency: currentUrgency, status: currentStatus }, patch };
 }
 
 /** True when renewalDate is inside the "renews within N days" window. */
