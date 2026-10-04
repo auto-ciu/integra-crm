@@ -223,3 +223,45 @@ export async function findActiveRegistration(trainingEventId: string, personId: 
   });
   return ((trainingRegistrations?.edges ?? []) as Array<{ node: { id: string } }>)[0]?.node.id ?? null;
 }
+
+// ------------------------------------------------------- B2 stream pipeline
+
+export type StreamLineRecord = {
+  opportunityId: string | null;
+  stageName: string | null;
+  stageOrder: number | null;
+  estimatedValueEur: number | null;
+  probability: number | null;
+  expectedCloseDate: string | null;
+  isActive: boolean | null;
+};
+
+/** Every active opportunity line of one stream, with its stage (max 500). */
+export async function fetchStreamLines(streamId: string): Promise<StreamLineRecord[]> {
+  const { opportunityLines } = await new CoreApiClient().query({
+    opportunityLines: {
+      __args: {
+        filter: { streamId: { eq: streamId }, isActive: { eq: true } },
+        first: 500,
+      },
+      edges: {
+        node: {
+          opportunityId: true,
+          estimatedValueEur: true,
+          probability: true,
+          expectedCloseDate: true,
+          isActive: true,
+          stage: { stageName: true, order: true },
+        },
+      },
+    },
+  });
+  type Node = Omit<StreamLineRecord, 'stageName' | 'stageOrder'> & {
+    stage: { stageName: string | null; order: number | null } | null;
+  };
+  return ((opportunityLines?.edges ?? []) as Array<{ node: Node }>).map(({ node: { stage, ...line } }) => ({
+    ...line,
+    stageName: stage?.stageName ?? null,
+    stageOrder: stage?.order ?? null,
+  }));
+}

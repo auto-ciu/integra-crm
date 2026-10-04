@@ -102,6 +102,22 @@ export default defineObject({
       inverseFieldId: IDS.discoveredCompany.fields.recommendedStream,
     }),
     oneToMany({
+      universalIdentifier: F.stages,
+      name: 'stages',
+      label: 'Stages · 阶段',
+      icon: 'IconListNumbers',
+      targetObjectId: IDS.streamStage.object,
+      inverseFieldId: IDS.streamStage.fields.stream,
+    }),
+    oneToMany({
+      universalIdentifier: F.opportunityLines,
+      name: 'opportunityLines',
+      label: 'Opportunity lines · 商机明细',
+      icon: 'IconListDetails',
+      targetObjectId: IDS.opportunityLine.object,
+      inverseFieldId: IDS.opportunityLine.fields.stream,
+    }),
+    oneToMany({
       universalIdentifier: F.contacts,
       name: 'contacts',
       label: 'Contacts · 联系人',

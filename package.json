@@ -17,6 +17,8 @@
     "stages:dry": "node ops/sync-opportunity-stages.mjs --dry-run",
     "streams:seed": "node ops/seed-product-streams.mjs",
     "streams:dry": "node ops/seed-product-streams.mjs --dry-run",
+    "stream-stages:seed": "node ops/seed-stream-stages.mjs",
+    "stream-stages:dry": "node ops/seed-stream-stages.mjs --dry-run",
     "pricing:seed": "node ops/seed-pricing.mjs",
     "pricing:dry": "node ops/seed-pricing.mjs --dry-run",
     "pricing:publish": "node ops/publish-pricing.mjs",
