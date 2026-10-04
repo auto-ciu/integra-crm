@@ -234,6 +234,9 @@ export const FAIR_LEAD_SOURCE = options([
   ['OTHER_FAIR', 'Other fair · 其他展会', 'purple'],
   ['WALK_IN', 'Walk-in · 到访', 'green'],
   ['ONLINE', 'Online · 线上', 'blue'],
+  ['LINKEDIN', 'LinkedIn · LinkedIn', 'sky'],
+  ['REFERRAL', 'Referral · 推荐', 'cyan'],
+  ['WEBSITE', 'Website · 网站', 'grass'],
 ]);
 
 export const FOLLOW_UP_STATUS = options([
