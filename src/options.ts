@@ -6,8 +6,9 @@
  * yellow, red, orange, pink, sky, turquoise) — they map onto the workspace
  * theme, so the Integra ramps from crm/theme apply automatically.
  */
-import { options } from './lib/fields';
+import { options, type TagColor } from './lib/fields';
 import { OPPORTUNITY_STAGES } from '../shared/stages.mjs';
+import { CURRENCIES, DISPLAY_MODES, PRICE_PRODUCT_LINES, STRATEGY_TYPES } from '../shared/pricing.mjs';
 
 export const PROVINCE = options([
   ['GUANGDONG', 'Guangdong · 广东', 'blue'],
@@ -220,6 +221,18 @@ export const FOLLOW_UP_STATUS = options([
   ['QUALIFIED', 'Qualified · 已确认', 'green'],
   ['DISQUALIFIED', 'Disqualified · 不合格', 'gray'],
 ]);
+
+// ------------------------------------------------------- C1 pricing engine
+
+/** shared/pricing.mjs rows → option list (the .mjs colours are plain strings). */
+const fromShared = (rows: Array<{ value: string; label: string; color: string }>) =>
+  options(rows.map((r): [string, string, TagColor] => [r.value, r.label, r.color as TagColor]));
+
+export const PRICING_STRATEGY_TYPE = fromShared(STRATEGY_TYPES);
+export const PRICING_DISPLAY_MODE = fromShared(DISPLAY_MODES);
+/** PRODUCT_LINE plus OTHER, for price items that belong to no product line. */
+export const PRICE_PRODUCT_LINE = fromShared(PRICE_PRODUCT_LINES);
+export const PRICE_CURRENCY = fromShared(CURRENCIES);
 
 /** Re-exported so views can import stages from the same module as the rest. */
 export { OPPORTUNITY_STAGES };

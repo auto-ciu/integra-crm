@@ -17,12 +17,14 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/lib/theme.ts                 --t-* token styles; brand gold pair as var() fallbacks
 ├── src/objects/{company,person,opportunity,workspace-member}/*.field.ts   standard-object extensions (defineField)
 ├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule,
-│                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead
+│                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead,
+│                                    PricingStrategy, PriceItem
 ├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban,
-│                                    Product Streams table, widgets
-├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs), Today (standalone)
-├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub)
-├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams
+│                                    Product Streams table, Pricing Strategies + Price Items tables, widgets
+├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs),
+│                                    Pricing Strategy record page (2 tabs), Today (standalone)
+├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub), PricingDisplay (stub)
+├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams, Pricing
 ├── src/logic-functions/             F0.3 spike: health-check (httpRoute), company-created (databaseEvent), daily-heartbeat (cron)
 ├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub), fair-lead-intake,
 │                                    score-fair-lead (A1 stub); lib/sidecar.ts shared HTTP + CRM helpers. Not app entities
@@ -31,10 +33,13 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── shared/icp.mjs                   freemail list + e-mail-domain → Company matching
 ├── shared/streams.mjs               the nine product streams, one per PRODUCT_CATEGORY (seed + verify read this)
 ├── shared/scoring.mjs               fair-lead score rules (A1 stub; score-fair-lead + verify read this)
+├── shared/pricing.mjs               C1 pricing: option sets, D3 display rules, canonical strategies, pricing.json transform
 ├── ops/lib/twenty-api.{mjs,ts}      REST/metadata client (ops scripts; .ts port for the sidecar)
 ├── ops/nightly-status.mjs           urgency/status recompute via REST (idempotent, --dry-run)
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
 ├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
+├── ops/seed-pricing.mjs             creates missing strategies + price items from shared/pricing.mjs, recounts itemCount
+├── ops/publish-pricing.mjs          live pricing → pricing.json for the website (read-only; .github/workflows/publish-pricing.yml)
 ├── docs/logic-function-spike.md     F0.3 findings: what logic functions can do on 2.41, and the decision
 └── verify-model.mjs                 dependency-free static check (npm run verify)
 ```
@@ -62,6 +67,8 @@ npm run deploy                    # twenty apply: apply them
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run stages:dry   # then stages:sync
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run nightly:dry  # then nightly (cron)
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run streams:dry  # then streams:seed
+TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:dry  # then pricing:seed
+TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:publish  # writes ./pricing.json
 ```
 
 ## Model
@@ -84,11 +91,23 @@ TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run streams:dry  # t
 | Stream Document | new | title (`name`), stream→, file, version, effectiveDate, documentType |
 | Stream Contact | new | name, stream→, person→, role, notes |
 | Fair Lead | new | scanId (unique, label), person→, company→, companyName, source, productInterest (multi), notes, businessCardImage, followUpStatus, capturedAt, score, scoreBreakdown, scoredAt |
+| Pricing Strategy | new | name, correlationId (unique), strategyType, description, isActive, validFrom, validUntil, displayMode, sortOrder, itemCount (denormalised, recounted by `pricing:seed`), items |
+| Price Item | new | name, strategy→, productLine, tier, description, annualFeeEur, setupFeeEur, currencyCode, isHighlighted, isOnRequest, sortOrder, correlationId (unique) |
 
 Urgency windows (days to `renewalDate`): **None** > 180 · **Watch** 90–180 ·
 **Due** < 90 · **Overdue** < 0. `Active` flips to `Expiring` inside 90 days.
 Key dates live in `shared/urgency.mjs` (Canton Fair 15 Oct 2026 — edit there;
 Battery DPP mandate 18 Feb 2027).
+
+Pricing (C1): a Pricing Strategy says HOW a product line is sold; its Price
+Items hold the EUR prices. `displayMode` controls the website (D3 defaults:
+ADD_ON → from-price, FLAT → exact total, TIERED/BUNDLE → per option,
+QUOTE_ONLY/CUSTOM → hidden, shown "On request"). `npm run pricing:publish`
+writes `pricing.json` with only live strategies and public fields, and with
+no amounts for on-request items or hidden strategies. It goes to
+integrascientific/integra-scientific by hand, since that repo is under another
+GitHub account. The "Publish pricing" workflow uploads it as an artifact; the
+steps are in `ops/publish-pricing.mjs`.
 
 ## e2e contracts (crm/e2e/journey.spec.ts)
 
@@ -118,8 +137,8 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
   navigation shapes, `defineFrontComponent` (from `twenty-sdk/define`) and
   `useRecordId` (from `twenty-sdk/front-component`).
 - `npm run build` (`twenty dev:build`) succeeds with no warnings and the
-  manifest holds every entity: 12 objects, 24 standard-object fields, 16 views,
-  3 front components, 4 page layouts, 6 navigation items, 3 logic functions,
+  manifest holds every entity: 14 objects, 24 standard-object fields, 20 views,
+  4 front components, 5 page layouts, 7 navigation items, 3 logic functions,
   1 role.
 - `src/standard-ids.ts` matches the SDK's `STANDARD_OBJECT` constants.
 
@@ -152,7 +171,17 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      (`{ primaryPhoneNumber }`); whether REST accepts it without a country
      code is unconfirmed.
    - `StreamUpdate.updateType` is not called `type`, which Twenty reserves.
-6. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
+6. C1 pricing:
+   - The Pricing Strategy record page's Price Items table (`RECORD_TABLE`)
+     has the same scoping question as item 3.
+   - `fetchPricingStrategy` in `src/lib/data.ts` (PricingDisplay preview) has
+     the same generated-client caveat as item 1.
+   - `PriceItem.currencyCode` is not called `currency`, which Twenty reserves
+     (like `type`). `pricing.json` still calls it `currency`.
+   - The "Pricing" sidebar item is a `VIEW` item named "Pricing", so the label
+     is "Pricing" rather than the object's plural. Whether the sidebar shows
+     `name` for VIEW items is unconfirmed.
+7. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
    `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
    also need cron registration on the worker. See
    `docs/logic-function-spike.md`.

@@ -28,6 +28,11 @@
  *      (unique slugs), the fair-lead intake and score weights cover the same
  *      values, the score rules give the expected scores, and no custom object
  *      redeclares a Twenty system field (createdAt, …).
+ *  12. C1 pricing: shared/pricing.mjs D3 display rules cover every strategy
+ *      type, its tiers match the TIER select, the seed is three four-tier
+ *      ladders (Boss on request, Bundle = DPP + AR less the discount), and
+ *      buildPublicPricing publishes only live strategies, only public fields,
+ *      and no amounts for on-request items or HIDE strategies.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -46,6 +51,7 @@ const EXPECTED_OBJECTS = [
   'ArMandate', 'MandateProduct', 'TrainingEvent', 'Authority',
   'Enquiry', 'EnquiryMessage', 'EnquiryRoutingRule',
   'ProductStream', 'StreamUpdate', 'StreamDocument', 'StreamContact', 'FairLead',
+  'PricingStrategy', 'PriceItem',
 ];
 
 const failures = [];
@@ -316,6 +322,117 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`B1/A1: ${problems.join('; ')}`);
   else ok(`${PRODUCT_STREAMS.length} product streams = PRODUCT_CATEGORY; intake + score weights cover them; ${cases.length} fair-lead score cases; no system-field redeclared`);
+}
+
+// ------------------------------------------------------------ 12. C1 pricing
+{
+  const problems = [];
+  const p = await import(pathToFileURL(join(ROOT, 'shared/pricing.mjs')).href);
+  const values = (rows) => rows.map((r) => r.value);
+
+  // D3 display rules.
+  const D3 = {
+    ADD_ON: 'SHOW_FROM_PRICE',
+    FLAT: 'SHOW_EXACT_TOTAL',
+    TIERED: 'SHOW_PER_OPTION',
+    BUNDLE: 'SHOW_PER_OPTION',
+    QUOTE_ONLY: 'HIDE',
+    CUSTOM: 'HIDE',
+  };
+  for (const [type, mode] of Object.entries(D3)) {
+    if (p.DISPLAY_MODE_FOR_TYPE[type] !== mode) problems.push(`D3: ${type} → ${p.DISPLAY_MODE_FOR_TYPE[type]}, want ${mode}`);
+  }
+  const types = values(p.STRATEGY_TYPES);
+  const modes = values(p.DISPLAY_MODES);
+  const uncovered = types.filter((t) => !modes.includes(p.DISPLAY_MODE_FOR_TYPE[t]));
+  if (uncovered.length) problems.push(`DISPLAY_MODE_FOR_TYPE lacks a valid mode for ${uncovered.join(', ')}`);
+
+  const optionsSource = read('src/options.ts');
+  const tierBlock = /export const TIER = options\(\[([\s\S]*?)\]\);/.exec(optionsSource)?.[1] ?? '';
+  const tiers = [...tierBlock.matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  if (JSON.stringify(values(p.PRICE_TIERS)) !== JSON.stringify(tiers)) {
+    problems.push(`shared/pricing.mjs PRICE_TIERS [${values(p.PRICE_TIERS).join(', ')}] ≠ TIER [${tiers.join(', ')}]`);
+  }
+
+  // Seed: three four-tier ladders.
+  const seed = p.PRICING_STRATEGIES;
+  const allItems = seed.flatMap((s) => s.items);
+  const keys = [...seed.map((s) => s.correlationId), ...allItems.map((i) => i.correlationId)];
+  if (new Set(keys).size !== keys.length) problems.push('shared/pricing.mjs: duplicate correlationIds');
+  if (keys.some((k) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(k))) problems.push('shared/pricing.mjs: correlationIds must be kebab-case');
+  const lines = values(p.PRICE_PRODUCT_LINES);
+  for (const s of seed) {
+    if (!types.includes(s.strategyType)) problems.push(`${s.correlationId}: unknown strategyType ${s.strategyType}`);
+    if (s.displayMode !== p.DISPLAY_MODE_FOR_TYPE[s.strategyType]) problems.push(`${s.correlationId}: displayMode ${s.displayMode} breaks D3`);
+    if (JSON.stringify(s.items.map((i) => i.tier)) !== JSON.stringify(tiers)) problems.push(`${s.correlationId}: items are not one per tier in order`);
+    for (const i of s.items) {
+      if (!lines.includes(i.productLine)) problems.push(`${i.correlationId}: unknown productLine ${i.productLine}`);
+      const boss = i.tier === 'BOSS';
+      if (boss !== i.isOnRequest || boss !== (i.annualFeeEur === null)) {
+        problems.push(`${i.correlationId}: Boss (and only Boss) must be on request with no fee`);
+      }
+    }
+  }
+  const fee = (line, tier) => allItems.find((i) => i.productLine === line && i.tier === tier)?.annualFeeEur;
+  for (const tier of tiers.filter((t) => t !== 'BOSS')) {
+    const want = Math.round((fee('DPP', tier) + fee('AR', tier)) * (1 - p.BUNDLE_DISCOUNT) * 100) / 100;
+    if (fee('BUNDLE', tier) !== want) problems.push(`Bundle ${tier} = ${fee('BUNDLE', tier)}, want DPP + AR less ${p.BUNDLE_DISCOUNT * 100}% = ${want}`);
+  }
+
+  // Transform: seed as REST records, plus an inactive, an expired and a HIDE strategy.
+  let n = 0;
+  const strategies = [];
+  const items = [];
+  const add = (s, extra = {}) => {
+    const id = `s${(n += 1)}`;
+    strategies.push({ ...s, ...extra, id, description: { markdown: s.description, blocknote: null } });
+    items.push(...s.items.map((i) => ({ ...i, id: `${id}-${i.correlationId}`, strategyId: id, description: 'internal' })));
+  };
+  seed.forEach((s) => add(s));
+  add(seed[0], { correlationId: 'inactive', isActive: false });
+  add(seed[0], { correlationId: 'expired', validUntil: '2026-06-30' });
+  add(seed[0], { correlationId: 'quote', strategyType: 'QUOTE_ONLY', displayMode: null, sortOrder: 9 });
+  const now = new Date('2026-10-04T12:00:00Z');
+  const pub = p.buildPublicPricing(strategies.slice().reverse(), items, now);
+  const ids = pub.strategies.map((s) => s.id);
+  if (JSON.stringify(ids) !== JSON.stringify([...seed.map((s) => s.correlationId), 'quote'])) {
+    problems.push(`published strategies [${ids.join(', ')}]: want live only, in sortOrder`);
+  }
+  if (pub.publishedAt !== now.toISOString()) problems.push('publishedAt is not the ISO timestamp');
+  const STRATEGY_KEYS = ['id', 'name', 'type', 'description', 'displayMode', 'items'];
+  const ITEM_KEYS = ['correlationId', 'name', 'tier', 'tierLabel', 'annualFeeEur', 'setupFeeEur', 'currency', 'isHighlighted', 'isOnRequest'];
+  for (const s of pub.strategies) {
+    if (JSON.stringify(Object.keys(s)) !== JSON.stringify(STRATEGY_KEYS)) problems.push(`strategy keys [${Object.keys(s)}]`);
+    for (const i of s.items) {
+      if (JSON.stringify(Object.keys(i)) !== JSON.stringify(ITEM_KEYS)) problems.push(`item keys [${Object.keys(i)}]`);
+      if (i.isOnRequest && (i.annualFeeEur !== null || i.setupFeeEur !== null)) problems.push(`${i.correlationId}: on request but carries an amount`);
+    }
+  }
+  const quote = pub.strategies.find((s) => s.id === 'quote');
+  if (quote?.displayMode !== 'HIDE' || quote.items.some((i) => !i.isOnRequest)) problems.push('QUOTE_ONLY strategy not published as HIDE with every item on request');
+  const dpp = pub.strategies[0];
+  if (dpp?.description !== seed[0].description) problems.push('description not published as markdown');
+  if (JSON.stringify(dpp?.items[0]) !== JSON.stringify({
+    correlationId: 'dpp-beginner-2026', name: 'DPP Beginner', tier: 'BEGINNER', tierLabel: 'Beginner',
+    annualFeeEur: 950, setupFeeEur: null, currency: 'EUR', isHighlighted: false, isOnRequest: false,
+  })) problems.push(`dpp-beginner-2026 published as ${JSON.stringify(dpp?.items[0])}`);
+
+  // Display copy.
+  const priced = (displayMode) => ({ displayMode, items: [{ annualFeeEur: 2500, isOnRequest: false }, { annualFeeEur: 950, isOnRequest: false }, { annualFeeEur: null, isOnRequest: true }] });
+  const copy = [
+    [p.strategyHeadline(priced('SHOW_FROM_PRICE')), 'from €950'],
+    [p.strategyHeadline(priced('SHOW_EXACT_TOTAL')), '€3,450/yr'],
+    [p.strategyHeadline(priced('SHOW_PER_OPTION')), null],
+    [p.strategyHeadline(priced('HIDE')), 'On request'],
+    [p.strategyHeadline({ displayMode: 'SHOW_FROM_PRICE', items: [] }), 'On request'],
+    [p.itemPriceLabel({ annualFeeEur: 1020, isOnRequest: false }), '€1,020/yr'],
+    [p.itemPriceLabel({ annualFeeEur: 99.5, isOnRequest: false }), '€99.50/yr'],
+    [p.itemPriceLabel({ annualFeeEur: null, isOnRequest: true }), 'On request'],
+  ];
+  for (const [got, want] of copy) if (got !== want) problems.push(`display copy "${got}", want "${want}"`);
+
+  if (problems.length) fail(`C1 pricing: ${problems.join('; ')}`);
+  else ok(`C1 pricing: D3 rules for ${types.length} strategy types; ${seed.length}×${tiers.length} seed items (Boss on request, Bundle −${p.BUNDLE_DISCOUNT * 100}%); pricing.json filters live/public/on-request; ${copy.length} display-copy cases`);
 }
 
 // ----------------------------------------------------------------- report

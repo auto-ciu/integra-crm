@@ -5,8 +5,9 @@
  * `twenty-client-sdk/core`). The published package ships a stub whose
  * `query` is `any`; `twenty dev` / `twenty dev:build` regenerates it from the
  * workspace schema, after which these selections are type-checked against the
- * real `arMandate` / `arMandates` resolvers. The components only see the two
- * functions below and render a graceful fallback on any error.
+ * real `arMandate(s)` / `pricingStrategy` / `priceItems` resolvers. The
+ * components only see the functions below and render a graceful fallback on
+ * any error.
  */
 import { CoreApiClient } from 'twenty-client-sdk/core';
 
@@ -49,4 +50,80 @@ export async function fetchMandatesWithRenewalDate(): Promise<MandateRecord[]> {
     },
   });
   return ((arMandates?.edges ?? []) as Array<{ node: MandateRecord }>).map((edge) => edge.node);
+}
+
+// ------------------------------------------------------- C1 pricing preview
+
+export type PricingStrategyRecord = {
+  id: string;
+  correlationId: string | null;
+  name: string | null;
+  strategyType: string | null;
+  description: { markdown: string | null } | null;
+  displayMode: string | null;
+  isActive: boolean;
+  validFrom: string | null;
+  validUntil: string | null;
+  sortOrder: number | null;
+};
+
+export type PriceItemRecord = {
+  id: string;
+  strategyId: string | null;
+  correlationId: string | null;
+  name: string | null;
+  tier: string | null;
+  annualFeeEur: number | null;
+  setupFeeEur: number | null;
+  currencyCode: string | null;
+  isHighlighted: boolean;
+  isOnRequest: boolean;
+  sortOrder: number | null;
+};
+
+/** One pricing strategy and its price items (max 200), for the PricingDisplay preview. */
+export async function fetchPricingStrategy(
+  recordId: string,
+): Promise<{ strategy: PricingStrategyRecord | null; items: PriceItemRecord[] }> {
+  const { pricingStrategy, priceItems } = await new CoreApiClient().query({
+    pricingStrategy: {
+      __args: { filter: { id: { eq: recordId } } },
+      id: true,
+      correlationId: true,
+      name: true,
+      strategyType: true,
+      description: { markdown: true },
+      displayMode: true,
+      isActive: true,
+      validFrom: true,
+      validUntil: true,
+      sortOrder: true,
+    },
+    priceItems: {
+      __args: {
+        filter: { strategyId: { eq: recordId } },
+        orderBy: [{ sortOrder: 'AscNullsLast' }],
+        first: 200,
+      },
+      edges: {
+        node: {
+          id: true,
+          strategyId: true,
+          correlationId: true,
+          name: true,
+          tier: true,
+          annualFeeEur: true,
+          setupFeeEur: true,
+          currencyCode: true,
+          isHighlighted: true,
+          isOnRequest: true,
+          sortOrder: true,
+        },
+      },
+    },
+  });
+  return {
+    strategy: (pricingStrategy ?? null) as PricingStrategyRecord | null,
+    items: ((priceItems?.edges ?? []) as Array<{ node: PriceItemRecord }>).map((edge) => edge.node),
+  };
 }
