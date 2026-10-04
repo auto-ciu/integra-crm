@@ -422,6 +422,7 @@ export async function recordOutboundReply(ticket: TicketForActions, macroName: s
     ...(ticket.firstResponseAt ? {} : { firstResponseAt: now }),
     ...(ticket.status === 'CLOSED' || ticket.status === 'SPAM' ? {} : { status: 'PENDING' }),
   });
+}
 // ----------------------------------------------- B3 content / D3 competitors
 
 export type PublishedUpdateRecord = {
