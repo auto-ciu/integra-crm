@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 import { FINDING_CATEGORIES, FINDING_IMPORTANCES } from '../../../shared/research-prompts.mjs';
-import { CURRENCIES } from '../../../shared/pricing.mjs';
+import { CURRENCIES } from '../../../shared/public-pricing.mjs';
 
 const values = (rows: Array<{ value: string }>) => rows.map((r) => r.value) as [string, ...string[]];
 

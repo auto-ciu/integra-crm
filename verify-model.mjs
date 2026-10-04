@@ -375,7 +375,7 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   // Object structure, from the source: every plan field is declared, by name.
   const PLAN_FIELDS = {
-    'src/objects/offering.object.ts': ['name', 'offeringCode', 'productCategory', 'strategyType', 'displayFormat', 'fromPrefix', 'hasOptionalExtras', 'isActive', 'description', 'features', 'validFrom', 'validUntil', 'sortOrder', /* relation inverses: */ 'pricePoints', 'bundleItems', 'componentOf'],
+    'src/objects/offering.object.ts': ['name', 'offeringCode', 'productCategory', 'strategyType', 'displayFormat', 'fromPrefix', 'hasOptionalExtras', 'isActive', 'description', 'features', 'validFrom', 'validUntil', 'sortOrder', /* relation inverses: */ 'pricePoints', 'bundleItems', 'componentOf', 'competitorObservations'],
     'src/objects/price-point.object.ts': ['name', 'correlationId', 'offering', 'tier', 'annualFeeEur', 'setupFeeEur', 'currencyCode', 'isHighlighted', 'isOnRequest', 'isLegacy', 'sortOrder', 'description'],
     'src/objects/bundle-item.object.ts': ['name', 'bundle', 'component', 'included', 'sortOrder'],
     'src/objects/pricing-publication.object.ts': ['name', 'publishedAt', 'version', 'publishedBy', 'commitSha', 'isLive', 'notes'],
