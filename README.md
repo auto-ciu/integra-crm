@@ -18,24 +18,31 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/objects/{company,person,opportunity,workspace-member}/*.field.ts   standard-object extensions (defineField)
 ├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule,
 │                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead,
-│                                    PricingStrategy, PriceItem
+│                                    PricingStrategy, PriceItem, ReplyTemplate
 ├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban,
-│                                    Product Streams table, Pricing Strategies + Price Items tables, widgets
+│                                    Product Streams table, Pricing Strategies + Price Items tables, Reply Templates table, widgets
 ├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs),
 │                                    Pricing Strategy record page (2 tabs), Today (standalone)
 ├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub), PricingDisplay (stub)
 ├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams, Pricing
 ├── src/logic-functions/             F0.3 spike: health-check (httpRoute), company-created (databaseEvent), daily-heartbeat (cron)
 ├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub), fair-lead-intake,
-│                                    score-fair-lead (A1 stub); lib/sidecar.ts shared HTTP + CRM helpers. Not app entities
+│                                    score-fair-lead (A1 stub), send-auto-reply (E2), generate-stream-digest (B2),
+│                                    renewals-check, send-renewal-notifications (stub); lib/sidecar.ts shared HTTP + CRM
+│                                    helpers. Not app entities
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
-├── shared/urgency.mjs               renewal maths shared by widgets and the nightly job
+├── shared/urgency.mjs               renewal maths shared by widgets and renewals-check (planMandate)
+├── shared/reply-templates.mjs       E2: the ten seed templates, template choice (fallback order) and rendering
+├── shared/digest.mjs                B2: digest model, prices and the $10/session cost cap
 ├── shared/icp.mjs                   freemail list + e-mail-domain → Company matching
 ├── shared/streams.mjs               the nine product streams, one per PRODUCT_CATEGORY (seed + verify read this)
 ├── shared/scoring.mjs               fair-lead score rules (A1 stub; score-fair-lead + verify read this)
 ├── shared/pricing.mjs               C1 pricing: option sets, D3 display rules, canonical strategies, pricing.json transform
 ├── ops/lib/twenty-api.{mjs,ts}      REST/metadata client (ops scripts; .ts port for the sidecar)
-├── ops/nightly-status.mjs           urgency/status recompute via REST (idempotent, --dry-run)
+├── ops/lib/sidecar.mjs              client for the ops-invoked sidecar functions (SIDECAR_URL, OPS_TOKEN)
+├── ops/nightly-status.mjs           CLI over renewals-check: urgency/status recompute (idempotent, --dry-run)
+├── ops/seed-reply-templates.mjs     creates missing ReplyTemplate records from shared/reply-templates.mjs (--dry-run)
+├── ops/generate-all-digests.mjs     B2: one AI digest per active ProductStream via generate-stream-digest (weekly, --dry-run)
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
 ├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
 ├── ops/seed-pricing.mjs             creates missing strategies + price items from shared/pricing.mjs, recounts itemCount
@@ -65,10 +72,12 @@ npm run plan                      # twenty plan: preview metadata changes on the
 npm run deploy                    # twenty apply: apply them
 
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run stages:dry   # then stages:sync
-TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run nightly:dry  # then nightly (cron)
+SIDECAR_URL=https://… OPS_TOKEN=… npm run nightly:dry                    # then nightly (cron)
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run streams:dry  # then streams:seed
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:dry  # then pricing:seed
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:publish  # writes ./pricing.json
+TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run replies:dry  # then replies:seed
+TWENTY_API_URL=… TWENTY_API_KEY=… SIDECAR_URL=… OPS_TOKEN=… npm run digests:dry  # then digests (weekly cron)
 ```
 
 ## Model
@@ -93,9 +102,12 @@ TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:publish 
 | Fair Lead | new | scanId (unique, label), person→, company→, companyName, source, productInterest (multi), notes, businessCardImage, followUpStatus, capturedAt, score, scoreBreakdown, scoredAt |
 | Pricing Strategy | new | name, correlationId (unique), strategyType, description, isActive, validFrom, validUntil, displayMode, sortOrder, itemCount (denormalised, recounted by `pricing:seed`), items |
 | Price Item | new | name, strategy→, productLine, tier, description, annualFeeEur, setupFeeEur, currencyCode, isHighlighted, isOnRequest, sortOrder, correlationId (unique) |
+| Reply Template | new | name, category (ENQUIRY_CATEGORY + ALL), language (EN/ZH/ALL), subject, body, isActive, sortOrder |
 
 Urgency windows (days to `renewalDate`): **None** > 180 · **Watch** 90–180 ·
-**Due** < 90 · **Overdue** < 0. `Active` flips to `Expiring` inside 90 days.
+**Due** < 90 · **Overdue** < 0. `Active` flips to `Expiring` inside 90 days,
+and `Expiring` back to `Active` once the renewal date is extended past them.
+Only live mandates (Active / Expiring) are checked.
 Key dates live in `shared/urgency.mjs` (Canton Fair 15 Oct 2026 — edit there;
 Battery DPP mandate 18 Feb 2027).
 
@@ -137,7 +149,7 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
   navigation shapes, `defineFrontComponent` (from `twenty-sdk/define`) and
   `useRecordId` (from `twenty-sdk/front-component`).
 - `npm run build` (`twenty dev:build`) succeeds with no warnings and the
-  manifest holds every entity: 14 objects, 24 standard-object fields, 20 views,
+  manifest holds every entity: 15 objects, 24 standard-object fields, 21 views,
   4 front components, 5 page layouts, 7 navigation items, 3 logic functions,
   1 role.
 - `src/standard-ids.ts` matches the SDK's `STANDARD_OBJECT` constants.
@@ -181,7 +193,21 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
    - The "Pricing" sidebar item is a `VIEW` item named "Pricing", so the label
      is "Pricing" rather than the object's plural. Whether the sidebar shows
      `name` for VIEW items is unconfirmed.
-7. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
+7. Wave 2 (E2 / B2 / renewals):
+   - `renewals-check` links its Notes to the mandate with a `noteTargets`
+     record keyed `arMandateId`. That assumes Twenty adds a noteTarget
+     relation for app objects as it does for custom ones. A failed note is
+     logged and counted (`noteErrors`, nightly exit 1); the urgency/status
+     write has already happened.
+   - The sidecar functions are routed at `<SIDECAR_URL>/<function-name>`
+     behind bearer `OPS_TOKEN`; the API Gateway routes are not deployed yet.
+   - `generate-stream-digest` has no web search: the model answers from its
+     own knowledge, so "the last 30 days" may be thin. The prompt tells it to
+     say so and not invent; every update is footnoted as unverified. Live,
+     cited research is Feature D.
+   - `send-auto-reply` records the reply (OUTBOUND, isAutoReply, sentAt
+     empty) but sends nothing: `sent` is false until SES is wired.
+8. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
    `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
    also need cron registration on the worker. See
    `docs/logic-function-spike.md`.

@@ -9,6 +9,8 @@
  *   3. Company: match by e-mail domain (freemail skipped — shared/icp.mjs).
  *      No Company is created here; Promote to lead does that.
  *   4. Enquiry (status NEW) + its INBOUND Enquiry Message.
+ *   5. Auto-reply (send-auto-reply, E2). A failure is logged, not returned:
+ *      the enquiry is already saved.
  *
  * Not yet: triage hand-off (enquiry-triage), routing rules, SES notifications.
  *
@@ -33,6 +35,7 @@ import {
   type TwentyRecord,
 } from '../../ops/lib/twenty-api';
 import { json, matchCompany, randomToken, readAuthorisedJson, splitName, type HttpEvent, type HttpResult } from './lib/sidecar';
+import { sendAutoReply } from './send-auto-reply';
 
 // ------------------------------------------------------------------ payload
 
@@ -188,6 +191,20 @@ export async function intakeEnquiry(config: TwentyConfig, p: EnquiryPayload, now
     sentAt: now.toISOString(),
     isAutoReply: false,
   });
+
+  try {
+    await sendAutoReply(config, {
+      enquiryId: enquiry.id,
+      reference,
+      category: p.interest,
+      language: p.language,
+      name: p.name,
+      company: p.company,
+      spamCheck: p.spamCheck,
+    });
+  } catch (error) {
+    console.error('[enquiry-intake] auto-reply failed', enquiry.id, error instanceof TwentyApiError ? { message: error.message, body: error.body } : error);
+  }
 
   return { reference, enquiryId: enquiry.id, personId: person.id, companyId: company?.id ?? null, duplicate: false };
 }

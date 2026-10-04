@@ -283,6 +283,20 @@ export const IDS = {
     },
   },
 
+  /** E2: auto-reply templates (category × language). */
+  replyTemplate: {
+    object: 'd9f42420-bc32-4939-8441-2ece82bdaf23',
+    fields: {
+      name: '29413693-c01f-49e5-9a8a-796f120da16b',
+      category: '1c7bebfa-3711-4d96-ae21-4cae2cad6f1d',
+      language: 'ee62cd27-e910-4466-ae34-c64dbdd70521',
+      subject: '76929eca-56a9-4889-a159-f46f3d18e56f',
+      body: 'cc3c117e-7f4c-466c-95a6-97cdf6356d7c',
+      isActive: '1d1b5db1-f3cc-4637-b573-161aa67b7a41',
+      sortOrder: '9654c1d7-aa17-41ed-9c5e-4c6a9725562c',
+    },
+  },
+
   views: {
     companiesTable: {
       view: 'e8f90a1b-0001-4eaf-ba05-162738495a6b',
@@ -519,6 +533,16 @@ export const IDS = {
         '0a6efcfb-fead-4999-8cf4-163d01ad2f5f',
       ],
       sort: '4692047d-c1e9-402e-815e-04e000300eb9',
+    },
+    replyTemplatesTable: {
+      view: '851e7855-99f0-4236-9526-379a11049d36',
+      fields: [
+        '727e8eaf-30e0-4682-a9f1-b64aef05885c',
+        'dcda2603-727f-45e9-915e-7c2c17cf0042',
+        '68a81f99-b9b4-4a1b-a890-c8da75dd779b',
+        '944ed5bf-b27e-4eb7-82a9-5953e7a2c1fc',
+      ],
+      sort: 'a7f69b77-a9d5-4136-a06e-89030942a5d0',
     },
   },
 

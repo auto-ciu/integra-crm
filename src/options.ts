@@ -181,6 +181,25 @@ export const MESSAGE_DIRECTION = options([
   ['NOTE', 'Internal note · 内部备注', 'yellow'],
 ]);
 
+// ------------------------------------------------------ E2 reply templates
+
+/** ENQUIRY_CATEGORY plus ALL, the catch-all (shared/reply-templates.mjs). */
+export const REPLY_TEMPLATE_CATEGORY = options([
+  ['DPP', 'DPP', 'blue'],
+  ['AR', 'EU Representative · 欧代', 'purple'],
+  ['TRAINING', 'Training · 培训', 'green'],
+  ['AUTHORITIES', 'For Authorities · 监管机构', 'turquoise'],
+  ['OTHER', 'Other · 其他', 'gray'],
+  ['ALL', 'All (catch-all) · 全部', 'bronze'],
+]);
+
+/** ENQUIRY_LANGUAGE plus ALL. */
+export const REPLY_TEMPLATE_LANGUAGE = options([
+  ['EN', 'EN', 'blue'],
+  ['ZH', 'ZH · 中文', 'red'],
+  ['ALL', 'All · 全部', 'bronze'],
+]);
+
 // ------------------------------------------------------- B1 product streams
 
 export const STREAM_UPDATE_TYPE = options([

@@ -19,7 +19,11 @@
     "streams:dry": "node ops/seed-product-streams.mjs --dry-run",
     "pricing:seed": "node ops/seed-pricing.mjs",
     "pricing:dry": "node ops/seed-pricing.mjs --dry-run",
-    "pricing:publish": "node ops/publish-pricing.mjs"
+    "pricing:publish": "node ops/publish-pricing.mjs",
+    "replies:seed": "node ops/seed-reply-templates.mjs",
+    "replies:dry": "node ops/seed-reply-templates.mjs --dry-run",
+    "digests": "node ops/generate-all-digests.mjs",
+    "digests:dry": "node ops/generate-all-digests.mjs --dry-run"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
