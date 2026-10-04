@@ -374,6 +374,43 @@ export const IDS = {
     },
   },
 
+  // ------------------------------------------------- C3 portal sync
+
+  customerEvent: {
+    object: 'd570f2dc-ab08-44c3-bec3-2dec378a0cff',
+    fields: {
+      name: '1e8d94bc-cc3f-4db0-b033-0d0791b5f54c',
+      eventType: '2128d828-5db4-493a-aca7-0741927961cf',
+      customer: 'b41036f0-43a8-4da4-8f57-906e4789a2f0',
+      data: 'c408ffa2-9fa8-44cf-a0cc-5e87e881172d',
+      source: 'caca0e97-d244-4b11-8932-386eecb444e0',
+      stripeEventId: '817dc3be-ff95-4c5b-b38d-d1e1a69cd46b',
+      processedAt: 'd4f616dd-13e9-44bb-9999-94bd38798235',
+      notes: 'f0f0a778-0f69-484b-865b-46ee07802733',
+    },
+  },
+
+  // ------------------------------------------------- D1-D2 AI market research
+
+  researchBrief: {
+    object: '5f587b73-e6ce-4ddf-8c1c-f0b62241af01',
+    fields: {
+      title: '526ec13f-4815-415a-b387-3c3df4878570',
+      topic: '174a57c6-3e47-454a-b140-d2bde3abb8b8',
+      scope: '34f4d439-9051-46da-8e1d-eaa06584ba50',
+      depth: 'dc39570e-3972-4b80-9c36-07be4aca4ea2',
+      prompt: '31abde87-4005-4986-b63d-850461dc4105',
+      status: '6fe800fd-1b18-4f18-8b97-d4aa1ed92d35',
+      result: 'd59cf536-d506-4231-894b-c9cf3aeae872',
+      resultJson: 'c6c0c1de-db7c-4956-94ae-c119f735cbea',
+      costUsd: 'c47dc277-ee79-45b6-9c4a-57d56d56f609',
+      submittedAt: 'cb96bb6c-eff4-4225-bf63-686f7e4a9d9c',
+      completedAt: '54ef6b1d-f477-4919-9bdb-3e02a27e716e',
+      sourceUrls: 'a103bcd3-6627-4876-9cb5-580609964e22',
+      isVerified: '97445c6a-d988-4eee-85f2-504ad544f539',
+    },
+  },
+
   views: {
     companiesTable: {
       view: 'e8f90a1b-0001-4eaf-ba05-162738495a6b',
@@ -677,6 +714,52 @@ export const IDS = {
         '49c3ff95-4963-4df6-b15f-13adb0d10026',
       ],
     },
+    customerEventsTable: {
+      view: 'd0be6fd5-570b-4474-af29-5b62042aa87f',
+      fields: [
+        '80a55da9-b440-4b87-b325-24c668bca22d',
+        'a1ac1fd1-259c-4766-b558-28b86a5ec8ae',
+        '69a1a942-7c58-4cfb-af1c-86169dbf3080',
+        'f40c01b2-dc87-47f8-9cdb-4eb34049f349',
+      ],
+      sort: '9fa179a9-eed7-4b70-a95e-3e2e2470d9bc',
+    },
+    researchBriefsTable: {
+      view: 'bbbb44d9-7cd9-43a4-8cbc-1fa5bdf046f3',
+      fields: [
+        '5151a2ff-df8d-4179-a154-fbffa0cb736f',
+        '8892453e-95f7-41e8-a63f-f8c4696cc210',
+        '39d36a76-ce88-4038-97c6-5eca448845dd',
+        '3422d25b-4930-4110-985f-c70ceb42b95d',
+        'd56809d9-0a32-48b9-a2e2-d863f182e6bf',
+        'd3b256be-91e3-40e8-9226-260192aa86d2',
+      ],
+      sort: '95c3cd82-bd3b-413e-8573-8769b564db01',
+    },
+    researchBriefOverviewFields: {
+      view: 'ddafdd8b-c045-4b5b-99e4-bd78fa23c109',
+      fields: [
+        'f6788cdf-f75b-4871-9877-4df2b02bf446',
+        'e7b5a121-ec6f-4e9b-8cc0-8ac53af65b10',
+        '6fd6ce33-fe6f-41ea-8741-64c866028601',
+        'bea794f7-d5d3-471a-a17d-48c0ac7bb937',
+        '884e7a25-663e-496e-984e-a19dd226fc39',
+        '3705720b-3f81-4aad-b9a4-15182ee837cd',
+        '04b1342d-0e48-4116-843b-fbc8f2d6bee0',
+        'd1f45f09-8920-4c35-8ba8-19f05c125c99',
+        '33a47507-5762-44b0-8da7-b40a3806876b',
+        '9918a20b-f555-4894-adee-c61ab7cdda47',
+        '00628f57-a553-4e5a-a7b9-0dbd79dbf6c4',
+        '89b5541f-f7bc-4da9-80b2-21410eaafe24',
+        'c24b225a-473b-4fa8-8409-5586d37f4dc7',
+      ],
+    },
+    researchBriefResultFields: {
+      view: 'bdae03bc-ea74-4f10-a07c-d1a322458d9e',
+      fields: [
+        '863cc67a-1ecf-493c-ad86-45e6dcc30c52',
+      ],
+    },
   },
 
   frontComponents: {
@@ -755,7 +838,8 @@ export const IDS = {
         overviewFields: 'c7f604cd-100e-4d44-8dd2-c23bdce173a0',
         priceItems: 'bb1b5aa1-a790-4496-9495-9ba65c05ce7e',
       },
-    },    trainingEventRecord: {
+    },
+    trainingEventRecord: {
       layout: 'e4081265-97fd-41ca-8d02-bc97075dbe18',
       tabs: {
         overview: '7e1e627f-7973-48c1-9044-888246a591c3',
@@ -765,6 +849,17 @@ export const IDS = {
         registerButton: 'c796810e-22ad-49ac-8232-18fec4a2c066',
         overviewFields: 'd9fcef81-6049-4c18-a8a2-716f33983ffe',
         registrations: 'b3e632d5-c434-4bc3-9a6c-44060066301c',
+      },
+    },
+    researchBriefRecord: {
+      layout: '00d62429-77bc-407b-b7d7-7e6aeba90c1e',
+      tabs: {
+        overview: '26ecb350-3b9d-4c96-b658-d145ae47b294',
+        rawResult: '66ec8bae-0f40-4674-8f3d-12da33fbca88',
+      },
+      widgets: {
+        overviewFields: 'e3e45fb8-896d-4c4a-8224-3e9e3599ac17',
+        rawResult: '35ab25e2-d9d6-429e-8d90-4c6a545c1020',
       },
     },
   },
@@ -778,6 +873,8 @@ export const IDS = {
     productStreams: '6fdbe905-ea65-4ee3-af3d-7d7d6e4b72c3',
     pricing: '506d3e76-f244-41e7-a77b-7d1dce1e395f',
     leadDiscovery: 'b85ea1d6-f8cd-460c-8491-5e66a540c065',
+    portalEvents: '9c08b4b3-230b-40be-b966-d41c742efef5',
+    marketResearch: '67888fed-5e50-4f6e-aaf8-f4ca4e4c3014',
   },
 
   logicFunctions: {
