@@ -40,6 +40,12 @@
  *  14. B2 digests + renewals: the per-call worst case keeps a run over every
  *      stream under the $10 session cap, regulation numbers are recognised,
  *      and planMandate never flips status on a mandate without a date.
+ *  15. A2 lead discovery: one pinned company-page actor, no cookies anywhere,
+ *      person profiles never pass as company pages, an Apify item maps to the
+ *      expected DiscoveredCompany, the run cap holds, the off switch defaults
+ *      to off, and the score rules give the expected scores.
+ *  16. X5 training: the three seed events use real option values, a past
+ *      event is closed, and the registration statuses are as specified.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -60,6 +66,8 @@ const EXPECTED_OBJECTS = [
   'ProductStream', 'StreamUpdate', 'StreamDocument', 'StreamContact', 'FairLead',
   'PricingStrategy', 'PriceItem',
   'ReplyTemplate',
+  'LeadDiscoveryRun', 'DiscoveredCompany',
+  'TrainingRegistration',
 ];
 
 const failures = [];
@@ -559,6 +567,148 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`B2/renewals: ${problems.join('; ')}`);
   else ok(`B2 digests: worst-case run over ${PRODUCT_STREAMS.length} streams $${fullRun.toFixed(2)} ≤ $${d.SESSION_BUDGET_USD} cap; ${numbers.length} regulation-number cases. Renewals: ${plans.length} planMandate cases`);
+}
+
+// --------------------------------------------------------- 15. A2 lead discovery
+{
+  const problems = [];
+  const d = await import(pathToFileURL(join(ROOT, 'shared/lead-discovery.mjs')).href);
+  const optionsSource = read('src/options.ts');
+  const optionValues = (name) => {
+    const block = new RegExp(`export const ${name} = options\\(\\[([\\s\\S]*?)\\]\\);`).exec(optionsSource)?.[1] ?? '';
+    return [...block.matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  };
+  const categories = optionValues('PRODUCT_CATEGORY');
+  const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+  // Guardrails (a), (b), (f), (g).
+  if (d.APIFY_ACTOR !== 'harvestapi/linkedin-company') problems.push(`APIFY_ACTOR is ${d.APIFY_ACTOR}; only the company-page actor is approved`);
+  if (!/^\d+\.\d+\.\d+$/.test(d.APIFY_ACTOR_BUILD)) problems.push(`APIFY_ACTOR_BUILD "${d.APIFY_ACTOR_BUILD}" is not a pinned build number`);
+  for (const [file, text] of Object.entries(sources)) {
+    if (/cookie/i.test(stripComments(text))) problems.push(`${rel(file)} mentions cookies (guardrail b: no-cookie actors only)`);
+    for (const m of stripComments(text).matchAll(/\/acts\/([\w~.-]+)/g)) problems.push(`${rel(file)} calls actor ${m[1]} directly`);
+  }
+  if (d.isApifyEnabled({}) || d.isApifyEnabled({ APIFY_ENABLED: '1' }) || !d.isApifyEnabled({ APIFY_ENABLED: 'true' })) {
+    problems.push('isApifyEnabled: only APIFY_ENABLED=true may switch Apify on');
+  }
+  if (d.estimateCostUsd(d.MAX_RESULTS_PER_RUN) > d.RUN_SPEND_CEILING_USD) problems.push('a full run (MAX_RESULTS_PER_RUN) does not fit under RUN_SPEND_CEILING_USD');
+  if (d.estimateCostUsd(100) !== 0.4005) problems.push(`estimateCostUsd(100) = ${d.estimateCostUsd(100)}, want 0.4005`);
+
+  const urls = [
+    ['https://www.linkedin.com/company/Acme-Battery/?trk=x', 'https://www.linkedin.com/company/acme-battery'],
+    ['linkedin.com/company/acme-battery/about', 'https://www.linkedin.com/company/acme-battery'],
+    ['https://cn.linkedin.com/showcase/acme-energy', 'https://www.linkedin.com/showcase/acme-energy'],
+    ['https://www.linkedin.com/in/li-wei-12345', null],
+    ['https://www.linkedin.com/pub/li-wei/1/2/3', null],
+    ['https://www.linkedin.com/school/tsinghua', null],
+    ['https://linkedin.com.evil.example/company/acme', null],
+    ['', null],
+  ];
+  for (const [url, want] of urls) if (d.companyPageUrl(url) !== want) problems.push(`companyPageUrl(${url}) = ${d.companyPageUrl(url)}, want ${want}`);
+
+  // Item mapping.
+  const item = {
+    linkedinUrl: 'https://www.linkedin.com/company/acme-battery/',
+    name: 'Acme Battery Co., Ltd.',
+    tagline: 'LiFePO4 cells for Europe',
+    website: 'https://www.acme-battery.cn/en?utm_source=linkedin',
+    industries: ['Battery Manufacturing'],
+    specialities: ['energy storage', 'e-bike packs'],
+    employeeCountRange: { start: 201, end: 500 },
+    locations: [
+      { headquarter: false, parsed: { city: 'Rotterdam', country: 'Netherlands' } },
+      { headquarter: true, city: 'Shenzhen', parsed: { city: 'Shenzhen', state: 'Guangdong', country: 'China' } },
+    ],
+    phone: '+86 755 0000 0000',
+  };
+  const mapped = d.mapApifyItem(item, 'RUN1');
+  const r = mapped.ok ? mapped.record : {};
+  const want = {
+    companyName: 'Acme Battery Co., Ltd.',
+    website: 'https://www.acme-battery.cn',
+    linkedinUrl: 'https://www.linkedin.com/company/acme-battery',
+    industry: 'Battery Manufacturing',
+    companySize: '201-500',
+    headquarters: 'Shenzhen, Guangdong, China',
+    productCategories: ['BATTERY_LI_ION', 'BATTERY_LMT'],
+  };
+  for (const [k, v] of Object.entries(want)) if (JSON.stringify(r[k]) !== JSON.stringify(v)) problems.push(`mapApifyItem ${k} = ${JSON.stringify(r[k])}, want ${JSON.stringify(v)}`);
+  if (!String(r.description ?? '').includes('build') || !String(r.description ?? '').includes('RUN1')) problems.push('mapApifyItem: description lacks provenance (actor build + run)');
+  if ('phone' in r) problems.push('mapApifyItem copies a phone number; discovery keeps company data only');
+  const dropped = [
+    [{ ...item, linkedinUrl: 'https://www.linkedin.com/in/li-wei' }, 'not_company_page'],
+    [{ ...item, website: '' }, 'no_website'],
+  ];
+  for (const [x, reason] of dropped) {
+    const m = d.mapApifyItem(x);
+    if (m.ok || m.reason !== reason) problems.push(`mapApifyItem should drop ${reason}, got ${JSON.stringify(m.ok ? 'ok' : m.reason)}`);
+  }
+  if (d.companySizeText({ employeeCount: 87 }) !== '51-200' || d.companySizeText({ employeeCountRange: { start: 10001 } }) !== '10001+') {
+    problems.push('companySizeText bands');
+  }
+  for (const c of d.categoriesFromText(['medical devices', 'consumer electronics'])) if (!categories.includes(c)) problems.push(`categoriesFromText → unknown ${c}`);
+
+  // Cost of a finished pay-per-event run (tiered price counts at its dearest tier).
+  const run = {
+    chargedEventCounts: { 'apify-actor-start': 1, 'apify-default-dataset-item': 40 },
+    pricingInfo: { pricingPerEvent: { actorChargeEvents: {
+      'apify-actor-start': { eventPriceUsd: 0.00005 },
+      'apify-default-dataset-item': { eventTieredPricingUsd: { FREE: { tieredEventPriceUsd: 0.004 }, GOLD: { tieredEventPriceUsd: 0.003 } } },
+    } } },
+  };
+  if (d.runCostUsd(run) !== 0.16005) problems.push(`runCostUsd(PPE run) = ${d.runCostUsd(run)}, want 0.16005`);
+  if (d.runCostUsd({ usageTotalUsd: 0.12 }) !== 0.12 || d.runCostUsd({}, 10) !== 0.04) problems.push('runCostUsd fallbacks');
+
+  // Score rules.
+  if (!same(Object.keys(d.CATEGORY_POINTS), categories)) problems.push('shared/lead-discovery.mjs CATEGORY_POINTS keys ≠ PRODUCT_CATEGORY');
+  if (Object.keys(d.CATEGORY_KEYWORDS).some((k) => !categories.includes(k))) problems.push('CATEGORY_KEYWORDS has a key that is not a PRODUCT_CATEGORY');
+  if (Math.max(...Object.values(d.CATEGORY_POINTS)) !== 40) problems.push('product category must be worth up to 40');
+  const scores = [
+    [r, 85],
+    [{ ...r, emailDomains: 'acme-battery.cn, qq.com' }, 100],
+    [{ productCategories: ['TEXTILES'], website: 'https://x.cn', linkedinUrl: null, emailDomains: '163.com', companySize: '11-50', headquarters: 'Hong Kong', industry: 'Textile Manufacturing' }, 30],
+    [{ productCategories: ['ELECTRONICS'], website: 'https://x.cn', linkedinUrl: 'https://www.linkedin.com/company/x', companySize: '51-200', headquarters: 'Ningbo, Zhejiang, China', industry: 'Appliances' }, 55],
+    [{}, 0],
+  ];
+  for (const [c, wantScore] of scores) {
+    const { score } = d.scoreDiscoveredCompany(c);
+    if (score !== wantScore) problems.push(`scoreDiscoveredCompany(${JSON.stringify(c).slice(0, 80)}…) = ${score}, want ${wantScore}`);
+  }
+
+  if (problems.length) fail(`A2 lead discovery: ${problems.join('; ')}`);
+  else ok(`A2 lead discovery: ${d.APIFY_ACTOR}@${d.APIFY_ACTOR_BUILD} only, no cookies, off unless APIFY_ENABLED=true; ${urls.length} company-page URL cases; item mapping + provenance; run cap $${d.RUN_SPEND_CEILING_USD}; ${scores.length} score cases`);
+}
+
+// ------------------------------------------------------------ 16. X5 training
+{
+  const problems = [];
+  const t = await import(pathToFileURL(join(ROOT, 'shared/training.mjs')).href);
+  const optionsSource = read('src/options.ts');
+  const optionValues = (name) => {
+    const block = new RegExp(`export const ${name} = options\\(\\[([\\s\\S]*?)\\]\\);`).exec(optionsSource)?.[1] ?? '';
+    return [...block.matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  };
+  const channels = optionValues('TRAINING_CHANNEL');
+  const languages = optionValues('LANGUAGE');
+  const statuses = optionValues('TRAINING_REGISTRATION_STATUS');
+  if (JSON.stringify(statuses) !== JSON.stringify(['REGISTERED', 'CONFIRMED', 'ATTENDED', 'CANCELLED', 'NO_SHOW'])) {
+    problems.push(`TRAINING_REGISTRATION_STATUS is [${statuses.join(', ')}]`);
+  }
+  const names = t.TRAINING_EVENTS.map((e) => e.name);
+  if (t.TRAINING_EVENTS.length !== 3 || new Set(names).size !== 3) problems.push('want three uniquely named seed events');
+  for (const e of t.TRAINING_EVENTS) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(e.date) || Number.isNaN(Date.parse(e.date))) problems.push(`${e.name}: bad date ${e.date}`);
+    if (!channels.includes(e.channel)) problems.push(`${e.name}: channel ${e.channel} is not a TRAINING_CHANNEL`);
+    if (!languages.includes(e.language)) problems.push(`${e.name}: language ${e.language} is not a LANGUAGE`);
+  }
+  const now = new Date('2026-11-15T23:00:00Z');
+  const passed = [['2026-11-14', true], ['2026-11-15', false], ['2026-11-16', false], [null, false], ['', false]];
+  for (const [date, want] of passed) if (t.eventHasPassed(date, now) !== want) problems.push(`eventHasPassed(${date}) !== ${want}`);
+  if (t.isActiveRegistration({ status: 'CANCELLED' }) || !t.isActiveRegistration({ status: 'NO_SHOW' })) problems.push('only CANCELLED frees a place');
+  if (t.registrationName('DPP Compliance Masterclass', { firstName: 'Wei', lastName: 'Li' }) !== 'DPP Compliance Masterclass — Wei Li') problems.push('registrationName');
+
+  if (problems.length) fail(`X5 training: ${problems.join('; ')}`);
+  else ok(`X5 training: ${t.TRAINING_EVENTS.length} seed events (${names.join(' / ')}); ${passed.length} event-passed cases; statuses ${statuses.join('/')}`);
 }
 
 // ----------------------------------------------------------------- report
