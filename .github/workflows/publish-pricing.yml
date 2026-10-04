@@ -1,0 +1,30 @@
+# Publish pricing: CRM → pricing.json artifact (C1).
+#
+# Runs ops/publish-pricing.mjs against the CRM and uploads pricing.json as the
+# `pricing-json` artifact. It cannot open the PR on the website repo
+# (integrascientific/integra-scientific): that lives under another GitHub
+# account. Manual step: download the artifact and open the PR there; see the
+# header of ops/publish-pricing.mjs.
+#
+# Secrets: TWENTY_API_URL, TWENTY_API_KEY (a read-only API key is enough).
+name: Publish pricing
+on:
+  workflow_dispatch:
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The script is dependency-free (plain fetch), so no npm ci.
+      - run: node ops/publish-pricing.mjs --out=pricing.json
+        env:
+          TWENTY_API_URL: ${{ secrets.TWENTY_API_URL }}
+          TWENTY_API_KEY: ${{ secrets.TWENTY_API_KEY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pricing-json
+          path: pricing.json
+          if-no-files-found: error

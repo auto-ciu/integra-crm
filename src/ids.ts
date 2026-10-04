@@ -245,6 +245,44 @@ export const IDS = {
     },
   },
 
+  // ------------------------------------------------------ C1 pricing engine
+
+  pricingStrategy: {
+    object: '4a93d535-2940-4f78-b099-6b036937eab8',
+    fields: {
+      name: '520b9c13-b66b-45b7-ab5f-37b92206c324',
+      correlationId: 'd4405c9e-ba52-4052-805a-10f53c39d7e0',
+      strategyType: '5bc32922-0be6-41ca-b291-7e85e22ca2e9',
+      description: 'a97bc8ca-dc4a-4672-81ff-80750be9f313',
+      isActive: 'a0b7cce5-ee7d-462f-b827-4bbb5ca6c436',
+      validFrom: '57912e6e-6493-45a2-84c6-547d547fc82c',
+      validUntil: '1862e2be-ffc0-4cc6-a003-e50f4f4586ac',
+      displayMode: '59706016-bf06-48b0-a711-043333cb7c74',
+      sortOrder: '0581954c-ba0d-48e8-8d26-822945505772',
+      itemCount: '383ccb1c-da68-45f2-9823-0483c212b5fe',
+      /** inverse of priceItem.strategy */
+      items: '0419f7fe-7270-4e08-994c-83b8282bfcfb',
+    },
+  },
+
+  priceItem: {
+    object: 'ebd20485-ed8f-423a-89ff-3d1394b39f9b',
+    fields: {
+      name: 'f20cb2b3-cd1c-4811-a633-72fc79ea9914',
+      strategy: '97341d0c-a84e-4ed2-8c73-e496eef95bba',
+      productLine: 'b3f73e23-19b6-42fa-ac0e-d229724ffd7c',
+      tier: '882935df-e0f1-4eeb-a6e8-4c0e80b4138e',
+      description: '00aba843-5f59-4d6f-8c2c-45ad57776b15',
+      annualFeeEur: '7315cc14-b389-4884-b7f4-0f6f07232485',
+      setupFeeEur: '7c2611de-dd47-4ca6-bb81-67a30b19107a',
+      currencyCode: '02c8046f-ec25-43fe-bcb4-de08e8072453',
+      isHighlighted: '2d745fc0-2bf0-4ec0-b970-7b053bdbe9ea',
+      isOnRequest: '5a6d4ebc-3b67-47cc-b0aa-78f5aa1750dc',
+      sortOrder: 'ee63b9b9-462f-4449-8f30-ae7c50a4d853',
+      correlationId: '004ccb5b-4fb4-47a1-9912-bda779f78bd0',
+    },
+  },
+
   views: {
     companiesTable: {
       view: 'e8f90a1b-0001-4eaf-ba05-162738495a6b',
@@ -433,12 +471,62 @@ export const IDS = {
         '7c28b39d-5f3b-47b2-a132-b7d40220ddc8',
       ],
     },
+    pricingStrategiesTable: {
+      view: 'da31d3aa-b9e4-47ac-8063-40e9b5e4fa32',
+      fields: [
+        '2428385b-6de1-4fd3-8f51-60f577623585',
+        'b351700c-9256-4df3-9a18-e3df1dc3f0d4',
+        'de6b2249-13e6-4120-b53c-96e5674428bd',
+        '20b970ab-d513-45ed-82c2-ede338277542',
+        '250165d5-5361-4e70-8d90-33ba937eee4c',
+      ],
+      sort: 'cb18754e-52f0-442e-a2ce-40ff341bfc36',
+    },
+    priceItemsTable: {
+      view: '0efa6a99-e86f-43e5-bd23-8ebec14a11cf',
+      fields: [
+        '6e6476cc-7e17-476c-a6a1-d1729e8f2352',
+        '2d4f49a8-12f5-4ada-83b5-af4305c1a452',
+        '9a0e1b74-80d8-45af-a13d-a92eb5c80fac',
+        '83e0c8d3-9e63-49d6-abb4-902645968a69',
+        '3682a671-a4a4-4797-bca1-0c515d2b3e15',
+      ],
+      sort: '69355e6b-ff50-43a3-af1f-441c8177181c',
+    },
+    pricingStrategyOverviewFields: {
+      view: 'bb9cf523-079e-4636-9e1e-66b71482253b',
+      fields: [
+        '81b8eb95-11d7-4749-bd54-6c9a938264e2',
+        'a0a8b6f6-cd22-49ee-9ae6-5994bfe9a84b',
+        '9892f016-47a8-4e3a-93f6-756cbcca66b3',
+        '47a5363d-8fbd-477d-9afc-81f27a8b46e0',
+        '592d29ee-14a3-41de-a3a6-8b3692b75d83',
+        'f94062eb-3e94-49ca-ab84-1d694ba608d6',
+        '892da0c1-9008-4cf8-a2fa-e7477507660a',
+        '8dad10f3-1da4-416d-be60-aea10fa4394e',
+        '23366032-b34b-4b05-a8d2-05e133f64208',
+      ],
+    },
+    strategyPriceItemsWidget: {
+      view: '71b6a3a8-edba-4900-a8a2-8968de232c57',
+      fields: [
+        '037abdcd-3607-4321-8541-a1dd6d3fdfd8',
+        'a5d54d64-e4aa-4340-a322-6b8ecd01a98f',
+        'bfa85c30-93fc-41bc-a76c-ada66365cd6e',
+        'f4a84acc-d74e-4186-b7c7-dad20f5d260f',
+        'ae30b65a-556c-450b-adc6-3de428526265',
+        'e7213861-2790-4b1d-8235-c5ea6e48c5c4',
+        '0a6efcfb-fead-4999-8cf4-163d01ad2f5f',
+      ],
+      sort: '4692047d-c1e9-402e-815e-04e000300eb9',
+    },
   },
 
   frontComponents: {
     renewalBanner: '3d4e5f60-0001-4dde-a9f4-05162738495a',
     renewalCountWidget: '3d4e5f60-0002-4edf-ba05-162738495a6b',
     promoteToLeadButton: 'd736dec8-98e6-4e3f-9798-8983c93d700c',
+    pricingDisplay: 'c62acce9-9a0d-441b-a6d7-46604fc14f0a',
   },
 
   pageLayouts: {
@@ -498,6 +586,18 @@ export const IDS = {
         contacts: '89324e93-99f5-4b46-9923-60635538d353',
       },
     },
+    pricingStrategyRecord: {
+      layout: '2551cb6a-eb37-48ac-bba3-0b0ec6e32467',
+      tabs: {
+        overview: '9d0374e2-2609-4bc9-b11a-d8d402fc92e2',
+        priceItems: '96e6522a-690c-411a-b2e4-0c7f7c9d9651',
+      },
+      widgets: {
+        pricingPreview: '5b2d1543-c6b3-4ef4-9f17-2221b558cfa3',
+        overviewFields: 'c7f604cd-100e-4d44-8dd2-c23bdce173a0',
+        priceItems: 'bb1b5aa1-a790-4496-9495-9ba65c05ce7e',
+      },
+    },
   },
 
   navigation: {
@@ -507,6 +607,7 @@ export const IDS = {
     authorities: '60718293-0004-43f4-8f5a-6b7c8d9eafb0',
     enquiries: '0ddf4836-2b27-4fb2-9276-d1658e37714c',
     productStreams: '6fdbe905-ea65-4ee3-af3d-7d7d6e4b72c3',
+    pricing: '506d3e76-f244-41e7-a77b-7d1dce1e395f',
   },
 
   logicFunctions: {
