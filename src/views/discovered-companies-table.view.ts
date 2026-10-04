@@ -22,6 +22,10 @@ export default defineView({
     [D.score, 90],
     [D.isExportedToCRM, 110],
     [D.isDuplicate, 110],
+    [D.reviewStatus, 120],
+    [D.icpTier, 120],
+    [D.icpScore, 90],
+    [D.isGdprArt14Sent, 130],
   ]),
   sorts: [
     {
