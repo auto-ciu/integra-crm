@@ -54,7 +54,9 @@
  *      idempotent, and the webhook signature check accepts only a valid one.
  *  18. C3 portal sync: the event types and sources are as specified, only a
  *      purchase or renewal touches the pipeline, and on the Subscribed stage.
- *  19. D1-D2 research: one prompt per researchable product category, the
+ *  19. D1-D2 research (Claude Managed Agents): one prompt per researchable
+ *      product category, the plan's fields and objects, research/agent.md, the
+ *      pinned beta + $10 session budget, zod-validated ingest. Was: the
  *      prompt builder, and the BLOCKED answer while there is no API key.
  *
  *  20. F0.5: Person, Company and Opportunity have leadSource.
@@ -84,7 +86,7 @@ const EXPECTED_OBJECTS = [
   'ReplyTemplate',
   'LeadDiscoveryRun', 'DiscoveredCompany', 'LeadImport',
   'TrainingRegistration',
-  'CustomerEvent', 'ResearchBrief',
+  'CustomerEvent', 'ResearchBrief', 'ResearchReport', 'ResearchFinding', 'Competitor', 'CompetitorPriceObservation',
 ];
 
 const failures = [];
@@ -1003,13 +1005,60 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
   if (r.researchPrompt({ topic: 'OTHER' }) !== null || r.researchPrompt({ topic: 'TOYS', depth: 'NOPE' }) !== null) problems.push('no prompt for OTHER or an unknown depth');
   if (!r.researchPrompt({ topic: 'TOYS' }).includes(`Scope: ${r.DEFAULT_RESEARCH_SCOPE}.`)) problems.push('default scope');
 
-  // The skeleton is blocked without a key, and spends under the same cap as the digests.
-  const fn = read('src/functions/run-research.ts');
-  if (!fn.includes("'ANTHROPIC_API_KEY not configured'") || !fn.includes("status: 'BLOCKED'")) problems.push('run-research must answer BLOCKED / "ANTHROPIC_API_KEY not configured" without a key');
-  if (!/maxInputTokens\(/.test(fn) || !/DIGEST_MAX_OUTPUT_TOKENS/.test(fn)) problems.push('run-research must apply the B2 digest cost cap');
+  // Plan fields and objects (Managed Agents rewrite).
+  const objectFields = (file) => [...read(file).matchAll(/^\s+name: '([A-Za-z]+)',/gm)].map((m) => m[1]);
+  const needFields = (file, names) => {
+    const have = objectFields(file);
+    const missing = names.filter((n) => !have.includes(n));
+    if (missing.length) problems.push(`${file} lacks fields: ${missing.join(', ')}`);
+  };
+  needFields('src/objects/research-brief.object.ts', ['focusAreas', 'competitorWatchlist', 'regulatoryWatchlist', 'cadenceDays', 'subscribers', 'lastRunAt', 'nextRunAt', 'agentId', 'systemPromptVersion']);
+  needFields('src/objects/research-report.object.ts', ['brief', 'status', 'sessionId', 'startedAt', 'completedAt', 'costUsd', 'findingsCount', 'reportUrl', 'errorMessage']);
+  needFields('src/objects/research-finding.object.ts', ['report', 'brief', 'title', 'body', 'category', 'importance', 'sourceUrls', 'publicationDate', 'isCited', 'isTaskCreated', 'taskId', 'suggestedOwner']);
+  needFields('src/objects/competitor.object.ts', ['name', 'website', 'competitorOf', 'description', 'lastObservationAt']);
+  needFields('src/objects/competitor-price-observation.object.ts', ['competitor', 'offering', 'competitorPriceEur', 'currencyCode', 'observedAt', 'sourceUrl', 'notes']);
+
+  const reportStatuses = r.REPORT_STATUSES.map((d) => d.value).join();
+  const categoriesWant = 'REGULATORY,COMPETITOR,PRICING,DEMAND,TECHNOLOGY,OTHER';
+  if (reportStatuses !== 'RUNNING,INGESTING,READY,FAILED') problems.push(`report statuses are [${reportStatuses}]`);
+  if (r.FINDING_CATEGORIES.map((d) => d.value).join() !== categoriesWant) problems.push('finding categories');
+  if (r.FINDING_IMPORTANCES.map((d) => d.value).join() !== 'HIGH,MEDIUM,LOW') problems.push('finding importances');
+
+  // The agent prompt: no CRM credentials, linkedin blocked, the findings.json contract.
+  if (!existsSync(join(ROOT, 'research/agent.md'))) problems.push('research/agent.md is missing');
+  else {
+    const agent = read('research/agent.md');
+    if (!/^---\s*\nversion: \d+\s*\n---/.test(agent)) problems.push('research/agent.md has no version front matter');
+    if (!/linkedin\.com/.test(agent)) problems.push('agent.md must block linkedin.com');
+    if (!/no CRM credentials/i.test(agent)) problems.push('agent.md must say the agent has no CRM credentials');
+    for (const key of ['findings.json', 'report.md', 'sourceUrls', 'priceObservations', 'competitors']) {
+      if (!agent.includes(key)) problems.push(`agent.md output contract lacks ${key}`);
+    }
+  }
+
+  // Session request policy: pinned beta, $10 cap, outcome built from the brief.
+  const a = await import(pathToFileURL(join(ROOT, 'shared/research-agent.mjs')).href);
+  if (!/^managed-agents-\d{4}-\d{2}-\d{2}$/.test(a.MANAGED_AGENTS_BETA)) problems.push('Managed Agents beta header is not pinned');
+  if (JSON.stringify(a.RUN_BUDGET) !== '{"type":"limit","max_list_cost":{"amount":"1000","currency":"USD"}}') problems.push('run budget is not $10 (1000 cents)');
+  const desc = a.buildOutcomeDescription(
+    { title: 'T', focusAreas: { markdown: 'FOCUS' }, competitorWatchlist: 'COMP', regulatoryWatchlist: { markdown: 'REG' } },
+    [{ title: 'OLD', category: 'PRICING' }],
+  );
+  for (const bit of ['FOCUS', 'COMP', 'REG', 'OLD']) if (!desc.includes(bit)) problems.push(`outcome description lacks ${bit}`);
+  if (!a.RESEARCH_RUBRIC.includes('findings.json')) problems.push('rubric must check findings.json');
+
+  const scheduler = read('src/functions/research-scheduler.ts');
+  const managed = read('src/functions/lib/managed-agents.ts');
+  if (!/nextRunAt/.test(scheduler) || !/RUN_BUDGET/.test(scheduler) || !/status: 'RUNNING'/.test(scheduler)) problems.push('research-scheduler must use nextRunAt, the run budget and create RUNNING reports');
+  if (!managed.includes('/v1/sessions') || !managed.includes('user.define_outcome') || !managed.includes('MANAGED_AGENTS_BETA')) problems.push('managed-agents client must POST /v1/sessions with user.define_outcome and the pinned beta header');
+  if (/CRM|TWENTY_API/.test(managed.replace(/\/\*[\s\S]*?\*\//, ''))) problems.push('the Managed Agents client must never touch CRM credentials');
+  if (!/scope_id/.test(managed)) problems.push('ingest must list session files by scope_id');
+  const ingest = read('src/functions/research-ingest.ts');
+  if (!/FindingsFile\.safeParse/.test(read('src/functions/lib/research-contract.ts') + ingest)) problems.push('research-ingest must validate findings.json with zod');
+  if (existsSync(join(ROOT, 'src/functions/run-research.ts'))) problems.push('run-research.ts should be deleted (replaced by research-scheduler.ts)');
 
   if (problems.length) fail(`D1-D2 research: ${problems.join('; ')}`);
-  else ok(`D1-D2 research: ${r.RESEARCH_TOPICS.length} prompts on PRODUCT_CATEGORY topics (OTHER has none); ${depths.length} depths, ${statuses.length} statuses; prompt builder; run-research BLOCKED without a key, B2 cost cap`);
+  else ok(`D1-D2 research: ${r.RESEARCH_TOPICS.length} prompts on PRODUCT_CATEGORY topics (OTHER has none); ${depths.length} depths, ${statuses.length} statuses; prompt builder; plan fields + 4 research objects, agent.md, Managed Agents session (pinned beta, $10 cap, define_outcome), zod-validated ingest`);
 }
 
 // --------------------------------------------------------- 20. F0.5 leadSource
