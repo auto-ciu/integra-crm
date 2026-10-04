@@ -3,7 +3,6 @@
  * and status option sets, and how a ResearchBrief becomes the prompt sent to
  * Claude. Single source of truth for:
  *   - src/options.ts                    (ResearchBrief depth / status options)
- *   - src/functions/run-research.ts     (builds the prompt)
  *   - ops/seed-research-briefs.mjs      (one brief per topic)
  *   - verify-model.mjs                  (every prompt belongs to a product category)
  *
@@ -23,6 +22,28 @@ export const RESEARCH_STATUSES = [
   { value: 'IN_PROGRESS', label: 'In progress · 进行中', color: 'blue' },
   { value: 'COMPLETED', label: 'Completed · 已完成', color: 'green' },
   { value: 'FAILED', label: 'Failed · 失败', color: 'red' },
+];
+
+export const REPORT_STATUSES = [
+  { value: 'RUNNING', label: 'Running · 运行中', color: 'blue' },
+  { value: 'INGESTING', label: 'Ingesting · 导入中', color: 'orange' },
+  { value: 'READY', label: 'Ready · 就绪', color: 'green' },
+  { value: 'FAILED', label: 'Failed · 失败', color: 'red' },
+];
+
+export const FINDING_CATEGORIES = [
+  { value: 'REGULATORY', label: 'Regulatory · 法规', color: 'orange' },
+  { value: 'COMPETITOR', label: 'Competitor · 竞争对手', color: 'red' },
+  { value: 'PRICING', label: 'Pricing · 价格', color: 'green' },
+  { value: 'DEMAND', label: 'Demand · 需求', color: 'blue' },
+  { value: 'TECHNOLOGY', label: 'Technology · 技术', color: 'purple' },
+  { value: 'OTHER', label: 'Other · 其他', color: 'gray' },
+];
+
+export const FINDING_IMPORTANCES = [
+  { value: 'HIGH', label: 'High · 高', color: 'red' },
+  { value: 'MEDIUM', label: 'Medium · 中', color: 'orange' },
+  { value: 'LOW', label: 'Low · 低', color: 'gray' },
 ];
 
 export const DEFAULT_RESEARCH_SCOPE = 'EU';

@@ -35,7 +35,7 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 │                                    score-fair-lead (A1 stub), send-auto-reply (E2), generate-stream-digest (B2),
 │                                    renewals-check, send-renewal-notifications (stub), run-linkedin-discovery, apify-webhook,
 │                                    score-discovered-company, promote-discovered-company (A2), register-for-training (X5),
-│                                    sync-pricing-to-stripe + stripe-webhook (C2), sync-portal-event (C3), run-research (D1-D2, BLOCKED);
+│                                    sync-pricing-to-stripe + stripe-webhook (C2), sync-portal-event (C3), research-scheduler + research-ingest (D1-D2, Claude Managed Agents);
 │                                    lib/sidecar.ts shared HTTP + CRM helpers, lib/discovery.ts Apify client, lib/stripe.ts Stripe client. Not app entities
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
 ├── shared/urgency.mjs               renewal maths shared by widgets and renewals-check (planMandate)
@@ -296,11 +296,17 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      Subscribed, or creates one; a LOST opportunity is not reopened. A customer
      that matches no Person or Company still gets an Opportunity, named after
      them and linked to nobody. The portal-side caller is not written.
-   - `run-research` is BLOCKED: without `ANTHROPIC_API_KEY`
-     (`/integra/anthropic-api-key` in AWS Parameter Store, not yet created) it
-     answers `{ status: "BLOCKED", reason: "ANTHROPIC_API_KEY not configured" }`
-     and writes nothing. The call to Claude behind that guard (B2's $10 cap,
-     no web search, `resultJson` / `sourceUrls` left empty) has never run.
+   - Research (D1-D2) runs on Claude Managed Agents (beta, header pinned in
+     `shared/research-agent.mjs`). `research-scheduler` starts a session
+     (`POST /v1/sessions`, `user.define_outcome`, $10 budget) for each
+     ResearchBrief with `nextRunAt` due; `research-ingest` (every 15 min)
+     reads `findings.json` back, validates it with zod and creates findings,
+     Tasks for HIGH ones, competitors and price observations. The agent
+     (`research/agent.md`) has no CRM credentials. Not yet done: creating the
+     agent and environment (`agentId` is set by hand), the cron/API Gateway
+     wiring, and nothing has run against the live API.
+     Env: `ANTHROPIC_API_KEY`, `RESEARCH_ENVIRONMENT_ID`, optional
+     `RESEARCH_DEFAULT_ASSIGNEE_ID`.
 10. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
    `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
    also need cron registration on the worker. See

@@ -2,7 +2,7 @@
  * Research Brief (D1-D2) — one AI market-research question: a product-category
  * topic, a scope ("EU", "Global", "China") and a depth, the exact prompt sent
  * to Claude (built by shared/research-prompts.mjs), and what came back.
- * Run by src/functions/run-research.ts; seeded by ops/seed-research-briefs.mjs.
+ * Run by src/functions/research-scheduler.ts (Claude Managed Agents); seeded by ops/seed-research-briefs.mjs.
  *
  * `topic` reuses PRODUCT_CATEGORY, the same list as the product streams.
  * BLOCKED: nothing is submitted until ANTHROPIC_API_KEY is configured, so
@@ -13,8 +13,9 @@
  * the sources: AI research is not to be relied on before that.
  */
 import { defineObject } from '../lib/sdk';
-import { boolean, dateTime, number, richText, select, text } from '../lib/fields';
+import { boolean, dateTime, number, oneToMany, richText, select, text } from '../lib/fields';
 import { IDS } from '../ids';
+import { STANDARD } from '../standard-ids';
 import { PRODUCT_CATEGORY, RESEARCH_DEPTH, RESEARCH_STATUS } from '../options';
 
 const F = IDS.researchBrief.fields;
@@ -119,6 +120,85 @@ export default defineObject({
       label: 'Verified · 已核实',
       icon: 'IconRosetteDiscountCheck',
       description: 'Ticked once staff have checked the result against its sources',
+    }),
+    richText({
+      universalIdentifier: F.focusAreas,
+      name: 'focusAreas',
+      label: 'Focus areas · 研究重点',
+      icon: 'IconTarget',
+      description: 'What the agent should research',
+    }),
+    richText({
+      universalIdentifier: F.competitorWatchlist,
+      name: 'competitorWatchlist',
+      label: 'Competitor watchlist · 竞争对手清单',
+      icon: 'IconSwords',
+      description: 'Competitors to track',
+    }),
+    richText({
+      universalIdentifier: F.regulatoryWatchlist,
+      name: 'regulatoryWatchlist',
+      label: 'Regulatory watchlist · 法规清单',
+      icon: 'IconGavel',
+      description: 'Regulations to monitor',
+    }),
+    number({
+      universalIdentifier: F.cadenceDays,
+      name: 'cadenceDays',
+      label: 'Cadence (days) · 周期',
+      icon: 'IconRepeat',
+      description: 'Days between runs, e.g. 7 for weekly',
+    }),
+    oneToMany({
+      universalIdentifier: F.subscribers,
+      name: 'subscribers',
+      label: 'Subscribers · 订阅者',
+      icon: 'IconUsers',
+      description: 'Workspace members who get the digest. A member can follow one brief (Twenty has no many-to-many yet)',
+      targetObjectId: STANDARD.workspaceMember.object,
+      inverseFieldId: IDS.workspaceMember.fields.subscribedResearchBrief,
+    }),
+    dateTime({
+      universalIdentifier: F.lastRunAt,
+      name: 'lastRunAt',
+      label: 'Last run · 上次运行',
+      icon: 'IconHistory',
+    }),
+    dateTime({
+      universalIdentifier: F.nextRunAt,
+      name: 'nextRunAt',
+      label: 'Next run · 下次运行',
+      icon: 'IconCalendarClock',
+    }),
+    text({
+      universalIdentifier: F.agentId,
+      name: 'agentId',
+      label: 'Agent ID',
+      icon: 'IconRobot',
+      description: 'Managed Agents agent ID, set once by the setup script',
+    }),
+    text({
+      universalIdentifier: F.systemPromptVersion,
+      name: 'systemPromptVersion',
+      label: 'System prompt version',
+      icon: 'IconGitCommit',
+      description: 'SHA of research/agent.md the agent was created from',
+    }),
+    oneToMany({
+      universalIdentifier: F.reports,
+      name: 'reports',
+      label: 'Reports · 报告',
+      icon: 'IconReport',
+      targetObjectId: IDS.researchReport.object,
+      inverseFieldId: IDS.researchReport.fields.brief,
+    }),
+    oneToMany({
+      universalIdentifier: F.findings,
+      name: 'findings',
+      label: 'Findings · 发现',
+      icon: 'IconBulb',
+      targetObjectId: IDS.researchFinding.object,
+      inverseFieldId: IDS.researchFinding.fields.brief,
     }),
   ],
 });

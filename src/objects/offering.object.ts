@@ -140,5 +140,13 @@ export default defineObject({
       targetObjectId: IDS.bundleItem.object,
       inverseFieldId: IDS.bundleItem.fields.component,
     }),
+    oneToMany({
+      universalIdentifier: F.competitorObservations,
+      name: 'competitorObservations',
+      label: 'Competitor prices · 竞品价格',
+      icon: 'IconScale',
+      targetObjectId: IDS.competitorPriceObservation.object,
+      inverseFieldId: IDS.competitorPriceObservation.fields.offering,
+    }),
   ],
 });

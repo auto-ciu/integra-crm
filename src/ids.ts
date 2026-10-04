@@ -80,6 +80,10 @@ export const IDS = {
       leadImports: '69bfeca8-1acb-4850-af8c-d795b2deacfc',
       /** inverse of discoveredCompany.reviewedBy */
       reviewedDiscoveredCompanies: '95d56fce-7719-4b5a-a475-e1b5bb0b3292',
+      /** the brief this member gets the digest of (inverse of researchBrief.subscribers) */
+      subscribedResearchBrief: 'c533940b-d4c6-46ca-962e-e4bf3a577cee',
+      /** inverse of researchFinding.suggestedOwner */
+      suggestedResearchFindings: 'fa71e082-d7b8-4e6b-8634-81ca03e41137',
     },
   },
 
@@ -210,6 +214,8 @@ export const IDS = {
       contacts: '7923cde6-6833-4beb-bbed-2f35a7a2585e',
       /** inverse of discoveredCompany.recommendedStream */
       discoveredCompanies: '453955ec-354c-48b1-bf46-4a3bbd23f790',
+      /** inverse of competitor.competitorOf */
+      competitors: 'f8569c39-fb56-4b47-ae66-19f0d182cd7a',
     },
   },
 
@@ -293,6 +299,8 @@ export const IDS = {
       bundleItems: '6a7e5aa1-c4fb-4250-8eca-7fc5f38967eb',
       /** inverse of bundleItem.component */
       componentOf: '16572dd0-07d5-4b22-9215-f3c04bf7340f',
+      /** inverse of competitorPriceObservation.offering */
+      competitorObservations: '5fe48e48-8551-4392-963d-7503c7f23827',
     },
   },
 
@@ -494,6 +502,83 @@ export const IDS = {
       completedAt: '54ef6b1d-f477-4919-9bdb-3e02a27e716e',
       sourceUrls: 'a103bcd3-6627-4876-9cb5-580609964e22',
       isVerified: '97445c6a-d988-4eee-85f2-504ad544f539',
+      focusAreas: '4e1a29e8-1e49-4b28-98b8-c628668ddfd9',
+      competitorWatchlist: '91a24a1a-57ce-4ac0-b1f1-11c6817a3201',
+      regulatoryWatchlist: 'a19e5d52-d8e7-4a25-9add-40f4500a6a11',
+      cadenceDays: '5a262812-ddca-4412-96c3-a91512d48ff5',
+      lastRunAt: '96a8489b-4c2c-4167-87eb-f8c21ca08d4c',
+      nextRunAt: 'f8eb5d9b-18c9-4205-a970-841e2c02bc2a',
+      agentId: 'a854330e-da9d-4b62-9093-dea7d408ac32',
+      systemPromptVersion: '27f2aa67-f313-4642-8d59-b8de45e17adb',
+      /** inverse of workspaceMember.subscribedResearchBrief */
+      subscribers: 'b9ff491f-6111-4bee-985e-258f1090aef5',
+      /** inverse of researchReport.brief */
+      reports: '9b281994-b0e3-455e-bb47-35872822f0a5',
+      /** inverse of researchFinding.brief */
+      findings: 'a3d9e6dd-076e-428c-82c2-359fe6da1d54',
+    },
+  },
+
+  researchReport: {
+    object: '5bbc727d-cf1d-4642-9046-09ba2d02c262',
+    fields: {
+      name: 'c82971a6-b6d9-490d-a070-fb04e0ca1ded',
+      brief: '3e271137-4c04-472c-9d52-d8de29156e11',
+      status: 'b9a6aa92-82f3-4320-8220-b8e103d482ca',
+      sessionId: '2ff09afd-d92a-46ea-9405-95610c511f0b',
+      startedAt: '64dd034e-ea97-4b71-ad21-455ca8d869c5',
+      completedAt: '747ae8d5-e734-4156-84fd-f9b6469cf9ae',
+      costUsd: '0039546e-4b52-4131-abf0-a0ebb7ee4139',
+      findingsCount: 'a0ff369e-09fa-4245-b392-69dbf6506f68',
+      reportUrl: 'a3fd5a0a-aafa-4428-995a-d5afeabb3c24',
+      errorMessage: '2c7ab9a1-1874-435d-a231-e7bfd6b0de9a',
+      /** inverse of researchFinding.report */
+      findings: 'c8abc20f-241a-4b76-a0db-5c9e963a64d3',
+    },
+  },
+
+  researchFinding: {
+    object: '77b85a52-0cbf-498a-9ce3-d0ba21ec1441',
+    fields: {
+      report: '42f4ee15-a00b-4a61-8eaa-8bbb6b29d68c',
+      brief: 'fb0caba2-ddd7-4dec-a59c-81b6feb48cad',
+      title: 'c217900d-d2aa-40b2-80b6-4fe3ef8cd073',
+      body: 'd1cc9a9a-a4d0-4b66-96f1-78b2a7968043',
+      category: 'b432a654-13ec-4cf5-83bd-e16dff133b4b',
+      importance: '8df553c6-2c3d-4e8c-ac3b-29ca47a34872',
+      sourceUrls: 'db3265e7-51b1-4e1d-b1ca-48f9a469b6b8',
+      publicationDate: '56979268-e837-4759-915e-055d16a095c8',
+      isCited: '5efa23a8-6f9f-48ca-965c-ab77427cd13b',
+      isTaskCreated: '81f6cfd7-3cd3-4d23-8897-9b1454d3ffac',
+      taskId: 'e50faa13-9f8d-4262-ac15-2b5e00b710af',
+      suggestedOwner: 'f0f8a878-9609-46dd-8473-3c2b0393c469',
+    },
+  },
+
+  competitor: {
+    object: '2e381bc4-9035-4bb6-b66c-4fdd5489b27a',
+    fields: {
+      name: '8bd0c563-3b7f-47b0-b4ee-8a5f402aa9a0',
+      website: '9c15b826-82b9-4879-b306-6e8316b348a0',
+      competitorOf: 'e47ba71e-6b54-4c6c-8b68-3eb3f8f3b29f',
+      description: '6cb247bb-c6ae-4b74-b24a-b5441d952769',
+      lastObservationAt: '4a8ef1fc-1301-44ce-8861-42bf84dced22',
+      /** inverse of competitorPriceObservation.competitor */
+      priceObservations: '344c41c1-91ae-4ddc-a4f6-beb9cb4bc7cc',
+    },
+  },
+
+  competitorPriceObservation: {
+    object: '0753448d-9dcf-45f0-983d-fb538f26af15',
+    fields: {
+      name: 'c0aa19e8-964e-40dd-9b78-d49e579ebbce',
+      competitor: 'b41a4439-57ee-4d79-97a2-1226df7ceacc',
+      offering: 'ab049dce-f122-47f5-9d39-cba9f56a801b',
+      competitorPriceEur: '61fb2b9c-19bf-465b-9f7c-57897f3a9aba',
+      currencyCode: '68e5143c-ce4e-41b1-824d-1afb07a619bd',
+      observedAt: '77a64c50-f333-4d15-b445-c003509148ef',
+      sourceUrl: '64db9fa7-3ad8-4609-b8e9-f8063331aa20',
+      notes: 'f136735d-e624-443d-bfe1-0643092360b9',
     },
   },
 

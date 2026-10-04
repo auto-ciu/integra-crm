@@ -109,5 +109,13 @@ export default defineObject({
       targetObjectId: IDS.streamContact.object,
       inverseFieldId: IDS.streamContact.fields.stream,
     }),
+    oneToMany({
+      universalIdentifier: F.competitors,
+      name: 'competitors',
+      label: 'Competitors · 竞争对手',
+      icon: 'IconSwords',
+      targetObjectId: IDS.competitor.object,
+      inverseFieldId: IDS.competitor.fields.competitorOf,
+    }),
   ],
 });
