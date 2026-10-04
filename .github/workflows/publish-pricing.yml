@@ -6,7 +6,10 @@
 # account. Manual step: download the artifact and open the PR there; see the
 # header of ops/publish-pricing.mjs.
 #
-# Secrets: TWENTY_API_URL, TWENTY_API_KEY (a read-only API key is enough).
+# Each run also records a PricingPublication in the CRM (commit = this repo's
+# GITHUB_SHA), so the API key needs write access to pricingPublications.
+#
+# Secrets: TWENTY_API_URL, TWENTY_API_KEY.
 name: Publish pricing
 on:
   workflow_dispatch:

@@ -3,9 +3,9 @@
  * C2: sync the CRM's pricing to Stripe Products and Prices, via the
  * sync-pricing-to-stripe sidecar function.
  *
- *   node ops/sync-to-stripe.mjs [--dry-run] [--strategy=<crm id>] [--correlation-id=<id>[,<id>…]]
+ *   node ops/sync-to-stripe.mjs [--dry-run] [--offering=<crm id>] [--correlation-id=<id>[,<id>…]]
  *
- * With no filter, every live strategy is synced. --dry-run reads the CRM and
+ * With no filter, every live offering is synced. --dry-run reads the CRM and
  * prints what would be sent to Stripe (the products and prices the CRM asks
  * for, and what is skipped), without calling the sidecar or Stripe; whether
  * each one is a create or an update is only known to the sidecar. Otherwise
@@ -33,7 +33,7 @@ async function main() {
   const flags = parseArgs(process.argv.slice(2));
   const dryRun = flags['dry-run'] === true;
   const filter = {
-    ...(typeof flags.strategy === 'string' ? { strategyId: flags.strategy } : {}),
+    ...(typeof flags.offering === 'string' ? { offeringId: flags.offering } : {}),
     ...(typeof flags['correlation-id'] === 'string' ? { correlationIds: flags['correlation-id'].split(',').map((s) => s.trim()).filter(Boolean) } : {}),
   };
 
@@ -44,15 +44,15 @@ async function main() {
 
   if (dryRun) {
     const twenty = configFromEnv();
-    const [strategies, items] = await Promise.all([findAllRecords(twenty, 'pricingStrategies'), findAllRecords(twenty, 'priceItems')]);
-    const plan = planSync(strategies, items, filter);
+    const [offerings, pricePoints] = await Promise.all([findAllRecords(twenty, 'offerings'), findAllRecords(twenty, 'pricePoints')]);
+    const plan = planSync(offerings, pricePoints, filter);
     console.log(`\nProducts (${plan.products.length})`);
     console.log(table(['id', 'name', 'active'], plan.products.map((p) => [p.id, p.name, p.active ? 'yes' : 'no (hidden or not live)'])));
     console.log(`\nPrices (${plan.prices.length})`);
     console.log(table(['lookup key', 'product', 'amount / year', 'metadata'], plan.prices.map((p) => [p.lookupKey, p.productId, euro(p.unitAmount), Object.entries(p.metadata).filter(([k]) => !['correlationId', 'source'].includes(k)).map(([k, v]) => `${k}=${v}`).join(' ')])));
     if (plan.skipped.length) {
       console.log(`\nSkipped (${plan.skipped.length})`);
-      console.log(table(['price item', 'reason'], plan.skipped.map((s) => [s.correlationId, s.reason])));
+      console.log(table(['price point', 'reason'], plan.skipped.map((s) => [s.correlationId, s.reason])));
     }
     console.log(`\nwould sync ${plan.products.length} product(s) and ${plan.prices.length} price(s), skip ${plan.skipped.length}; nothing sent`);
     return;
@@ -66,7 +66,7 @@ async function main() {
   console.log(table(['kind', 'key', 'action'], result.changes.map((c) => [c.kind, c.key, c.action])));
   if (result.skipped.length) {
     console.log('');
-    console.log(table(['skipped price item', 'reason'], result.skipped.map((s) => [s.correlationId, s.reason])));
+    console.log(table(['skipped price point', 'reason'], result.skipped.map((s) => [s.correlationId, s.reason])));
   }
   console.log(`\n${JSON.stringify({ productsSynced: result.productsSynced, pricesSynced: result.pricesSynced, pricesSkipped: result.pricesSkipped, stripeMode: result.stripeMode })}`);
 }

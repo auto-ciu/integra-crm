@@ -1,70 +1,77 @@
 #!/usr/bin/env node
 /**
- * Create the canonical PricingStrategy and PriceItem records listed in
- * shared/pricing.mjs (C1): DSP, AR and Bundle, each Beginner / Boost /
- * Builder / Boss (Boss on request).
+ * Create the canonical Offering, PricePoint and BundleItem records listed in
+ * shared/public-pricing.mjs (C1): DPP, AR, the AR + DPP bundle, EPREL
+ * registration, Battery Passport, Training Live / Recorded and Boss.
  *
  *   node ops/seed-pricing.mjs [--dry-run]
  *
- * Idempotent, keyed by `correlationId`: strategies and items that already
- * exist are left exactly as they are (staff own prices once seeded), missing
- * ones are created. Every run then recomputes PricingStrategy.itemCount, so
- * re-running it refreshes the counts after items were added by hand.
+ * Idempotent: offerings are keyed by `offeringCode`, price points by
+ * `correlationId`, bundle items by (bundle, component). Anything that already
+ * exists is left exactly as it is (staff own prices once seeded); missing
+ * records are created.
  */
-import { PRICING_STRATEGIES } from '../shared/pricing.mjs';
-import {
-  TwentyApiError,
-  configFromEnv,
-  createRecord,
-  findAllRecords,
-  parseArgs,
-  updateRecord,
-} from './lib/twenty-api.mjs';
+import { BUNDLE_ITEMS, OFFERINGS, bundleItemName, bundleItemProblem } from '../shared/public-pricing.mjs';
+import { TwentyApiError, configFromEnv, createRecord, findAllRecords, parseArgs } from './lib/twenty-api.mjs';
+
+const richText = (markdown) => ({ markdown, blocknote: null });
 
 async function main() {
   const dryRun = parseArgs(process.argv.slice(2))['dry-run'] === true;
   const config = configFromEnv();
   const say = (msg) => console.log(`${dryRun ? '[dry-run] ' : ''}${msg}`);
 
-  const strategies = await findAllRecords(config, 'pricingStrategies');
-  const items = await findAllRecords(config, 'priceItems');
-  const strategyByKey = new Map(strategies.map((s) => [s.correlationId, s]));
-  const itemKeys = new Set(items.map((i) => i.correlationId));
+  const offerings = await findAllRecords(config, 'offerings');
+  const pricePoints = await findAllRecords(config, 'pricePoints');
+  const bundleItems = await findAllRecords(config, 'bundleItems');
+  const offeringByCode = new Map(offerings.map((o) => [o.offeringCode, o]));
+  const pointKeys = new Set(pricePoints.map((p) => p.correlationId));
   let created = 0;
 
-  for (const { items: seedItems, description, ...s } of PRICING_STRATEGIES) {
-    let strategy = strategyByKey.get(s.correlationId);
-    if (!strategy) {
-      say(`create strategy ${s.correlationId} (${s.name})`);
+  for (const { pricePoints: seedPoints, description, features, ...o } of OFFERINGS) {
+    let offering = offeringByCode.get(o.offeringCode);
+    if (!offering) {
+      say(`create offering ${o.offeringCode} (${o.name})`);
       created += 1;
-      strategy = dryRun
-        ? { id: `dry-run:${s.correlationId}`, correlationId: s.correlationId }
-        : await createRecord(config, 'pricingStrategies', {
-            ...s,
-            description: { markdown: description, blocknote: null },
+      offering = dryRun
+        ? { id: `dry-run:${o.offeringCode}`, ...o }
+        : await createRecord(config, 'offerings', {
+            ...o,
+            description: richText(description),
+            features: richText(features.map((f) => `- ${f}`).join('\n')),
           });
-      strategies.push(strategy);
+      offeringByCode.set(o.offeringCode, offering);
     }
-    for (const item of seedItems.filter((i) => !itemKeys.has(i.correlationId))) {
-      say(`create item ${item.correlationId} (${item.name})`);
+    for (const point of seedPoints.filter((p) => !pointKeys.has(p.correlationId))) {
+      say(`create price point ${point.correlationId} (${point.name})`);
       created += 1;
-      const record = dryRun
-        ? { id: `dry-run:${item.correlationId}` }
-        : await createRecord(config, 'priceItems', { ...item, strategyId: strategy.id });
-      items.push({ ...record, strategyId: strategy.id });
+      if (!dryRun) await createRecord(config, 'pricePoints', { ...point, offeringId: offering.id });
+      pointKeys.add(point.correlationId);
     }
   }
 
-  let recounted = 0;
-  for (const s of strategies) {
-    const count = items.filter((i) => i.strategyId === s.id).length;
-    if (s.itemCount === count) continue;
-    say(`itemCount ${s.correlationId ?? s.id}: ${s.itemCount ?? '—'} → ${count}`);
-    recounted += 1;
-    if (!dryRun) await updateRecord(config, 'pricingStrategies', s.id, { itemCount: count });
+  const itemKeys = new Set(bundleItems.map((b) => `${b.bundleId}:${b.componentId}`));
+  for (const seed of BUNDLE_ITEMS) {
+    const bundle = offeringByCode.get(seed.bundle);
+    const component = offeringByCode.get(seed.component);
+    const problem = bundleItemProblem(bundle, component);
+    if (problem) throw new Error(`bundle item ${seed.bundle} → ${seed.component}: ${problem}`);
+    if (itemKeys.has(`${bundle.id}:${component.id}`)) continue;
+    const name = bundleItemName(bundle, component);
+    say(`create bundle item ${name}`);
+    created += 1;
+    if (!dryRun) {
+      await createRecord(config, 'bundleItems', {
+        name,
+        bundleId: bundle.id,
+        componentId: component.id,
+        included: seed.included,
+        sortOrder: seed.sortOrder,
+      });
+    }
   }
 
-  console.log(`${dryRun ? 'would create' : 'created'} ${created} record(s), ${dryRun ? 'would update' : 'updated'} ${recounted} item count(s)`);
+  console.log(`${dryRun ? 'would create' : 'created'} ${created} record(s)`);
 }
 
 main().catch((error) => {

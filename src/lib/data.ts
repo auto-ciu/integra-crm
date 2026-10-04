@@ -5,7 +5,7 @@
  * `twenty-client-sdk/core`). The published package ships a stub whose
  * `query` is `any`; `twenty dev` / `twenty dev:build` regenerates it from the
  * workspace schema, after which these selections are type-checked against the
- * real `arMandate(s)` / `pricingStrategy` / `priceItems` / `trainingEvent` /
+ * real `arMandate(s)` / `offering` / `pricePoints` / `bundleItems` / `trainingEvent` /
  * `people` / `trainingRegistrations` resolvers. The components only see
  * the functions below and render a graceful fallback on any error.
  */
@@ -54,77 +54,125 @@ export async function fetchMandatesWithRenewalDate(): Promise<MandateRecord[]> {
 
 // ------------------------------------------------------- C1 pricing preview
 
-export type PricingStrategyRecord = {
+export type OfferingRecord = {
   id: string;
-  correlationId: string | null;
+  offeringCode: string | null;
   name: string | null;
   strategyType: string | null;
+  displayFormat: string | null;
+  fromPrefix: boolean;
+  hasOptionalExtras: boolean;
   description: { markdown: string | null } | null;
-  displayMode: string | null;
+  features: { markdown: string | null } | null;
   isActive: boolean;
   validFrom: string | null;
   validUntil: string | null;
   sortOrder: number | null;
 };
 
-export type PriceItemRecord = {
+export type PricePointRecord = {
   id: string;
-  strategyId: string | null;
+  offeringId: string | null;
   correlationId: string | null;
   name: string | null;
   tier: string | null;
   annualFeeEur: number | null;
-  setupFeeEur: number | null;
   currencyCode: string | null;
   isHighlighted: boolean;
   isOnRequest: boolean;
+  isLegacy: boolean;
+  description: string | null;
   sortOrder: number | null;
 };
 
-/** One pricing strategy and its price items (max 200), for the PricingDisplay preview. */
-export async function fetchPricingStrategy(
-  recordId: string,
-): Promise<{ strategy: PricingStrategyRecord | null; items: PriceItemRecord[] }> {
-  const { pricingStrategy, priceItems } = await new CoreApiClient().query({
-    pricingStrategy: {
+export type BundleItemRecord = {
+  id: string;
+  bundleId: string | null;
+  componentId: string | null;
+  included: boolean;
+  sortOrder: number | null;
+};
+
+/**
+ * One offering with its price points and, for a bundle, its components'
+ * offerings (max 200 price points), for the PricingDisplay preview.
+ */
+export async function fetchOffering(recordId: string): Promise<{
+  offering: OfferingRecord | null;
+  pricePoints: PricePointRecord[];
+  bundleItems: BundleItemRecord[];
+  components: OfferingRecord[];
+}> {
+  const { offering, pricePoints, bundleItems } = await new CoreApiClient().query({
+    offering: {
       __args: { filter: { id: { eq: recordId } } },
       id: true,
-      correlationId: true,
+      offeringCode: true,
       name: true,
       strategyType: true,
+      displayFormat: true,
+      fromPrefix: true,
+      hasOptionalExtras: true,
       description: { markdown: true },
-      displayMode: true,
+      features: { markdown: true },
       isActive: true,
       validFrom: true,
       validUntil: true,
       sortOrder: true,
     },
-    priceItems: {
+    pricePoints: {
       __args: {
-        filter: { strategyId: { eq: recordId } },
+        filter: { offeringId: { eq: recordId } },
         orderBy: [{ sortOrder: 'AscNullsLast' }],
         first: 200,
       },
       edges: {
         node: {
           id: true,
-          strategyId: true,
+          offeringId: true,
           correlationId: true,
           name: true,
           tier: true,
           annualFeeEur: true,
-          setupFeeEur: true,
           currencyCode: true,
           isHighlighted: true,
           isOnRequest: true,
+          isLegacy: true,
+          description: true,
           sortOrder: true,
         },
       },
     },
+    bundleItems: {
+      __args: {
+        filter: { bundleId: { eq: recordId } },
+        orderBy: [{ sortOrder: 'AscNullsLast' }],
+        first: 50,
+      },
+      edges: {
+        node: { id: true, bundleId: true, componentId: true, included: true, sortOrder: true },
+      },
+    },
   });
+  const items = ((bundleItems?.edges ?? []) as Array<{ node: BundleItemRecord }>).map((edge) => edge.node);
+  const componentIds = items.map((i) => i.componentId).filter((id): id is string => Boolean(id));
+  let components: OfferingRecord[] = [];
+  if (componentIds.length) {
+    const { offerings } = await new CoreApiClient().query({
+      offerings: {
+        __args: { filter: { id: { in: componentIds } }, first: 50 },
+        edges: {
+          node: { id: true, offeringCode: true, name: true, strategyType: true, isActive: true, validFrom: true, validUntil: true },
+        },
+      },
+    });
+    components = ((offerings?.edges ?? []) as Array<{ node: OfferingRecord }>).map((edge) => edge.node);
+  }
   return {
-    strategy: (pricingStrategy ?? null) as PricingStrategyRecord | null,
-    items: ((priceItems?.edges ?? []) as Array<{ node: PriceItemRecord }>).map((edge) => edge.node),
+    offering: (offering ?? null) as OfferingRecord | null,
+    pricePoints: ((pricePoints?.edges ?? []) as Array<{ node: PricePointRecord }>).map((edge) => edge.node),
+    bundleItems: items,
+    components,
   };
 }
 

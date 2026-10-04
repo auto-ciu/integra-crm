@@ -1,5 +1,5 @@
 /**
- * C2 Stripe sync: how CRM PricingStrategies / PriceItems map onto Stripe
+ * C2 Stripe sync: how CRM Offerings / PricePoints map onto Stripe
  * Products / Prices, and the webhook signature check. Single source of truth for:
  *   - src/functions/sync-pricing-to-stripe.ts   (reads the plan, applies it to Stripe)
  *   - src/functions/stripe-webhook.ts           (signature check)
@@ -7,25 +7,25 @@
  *   - verify-model.mjs                          (mapping rules, idempotency, signature)
  *
  * The CRM is the source of truth. Keys, so a re-run finds what the last one made:
- *   Product  id         = strategy.correlationId   (e.g. ar-2026)
- *   Price    lookup_key = item.correlationId       (e.g. ar-beginner-2026)
+ *   Product  id         = offering.offeringCode        (e.g. AR)
+ *   Price    lookup_key = pricePoint.correlationId     (e.g. ar-beginner-2026)
  * A Stripe price's amount, currency, interval and product cannot be edited, so
  * a changed fee makes a new price that takes over the lookup key and archives
  * the old one (sync-pricing-to-stripe.ts). Plain ESM, dependency-free.
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { displayModeFor, isLive } from './pricing.mjs';
+import { displayFormatFor, hidesAmounts, isLive } from './public-pricing.mjs';
 
 export const STRIPE_SOURCE = 'integra-crm';
 /** Fees are annual subscriptions. */
 export const PRICE_INTERVAL = 'year';
-/** `annualFeeEur` is always euros; PriceItem.currencyCode converts nothing. */
+/** `annualFeeEur` is always euros; PricePoint.currencyCode converts nothing. */
 export const STRIPE_CURRENCY = 'eur';
 
 /** Metadata keys the sync owns: it sets them, and clears them when they stop applying. */
-export const PRODUCT_METADATA_KEYS = ['correlationId', 'source', 'strategyType'];
-export const PRICE_METADATA_KEYS = ['correlationId', 'source', 'tier', 'productLine', 'displayMode', 'highlighted'];
+export const PRODUCT_METADATA_KEYS = ['offeringCode', 'source', 'strategyType'];
+export const PRICE_METADATA_KEYS = ['correlationId', 'source', 'tier', 'offeringCode', 'displayFormat', 'highlighted'];
 
 /**
  * "test" or "live" from the shape of the secret key; null when it is not a Stripe secret / restricted key.
@@ -42,89 +42,92 @@ export const toCents = (eur) => Math.round(Number(eur) * 100);
 const markdownOf = (richText) => (typeof richText === 'string' ? richText : richText?.markdown ?? '').trim();
 const present = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== ''));
 
-/** The Stripe Product a strategy should be. */
-export function desiredProduct(strategy, today) {
-  const hidden = displayModeFor(strategy) === 'HIDE';
+/** The Stripe Product an offering should be. */
+export function desiredProduct(offering, today) {
   return {
-    id: strategy.correlationId,
-    name: strategy.name,
-    description: markdownOf(strategy.description),
-    // HIDE strategies are "on request": no purchasable product. Neither is one outside its validity window.
-    active: isLive(strategy, today) && !hidden,
-    metadata: present({ correlationId: strategy.correlationId, source: STRIPE_SOURCE, strategyType: strategy.strategyType }),
+    id: offering.offeringCode,
+    name: offering.name,
+    description: markdownOf(offering.description),
+    // Offerings that never show an amount (contact CTA, hidden, quote-only) have no purchasable
+    // product. Neither does one outside its validity window.
+    active: isLive(offering, today) && !hidesAmounts(offering),
+    metadata: present({ offeringCode: offering.offeringCode, source: STRIPE_SOURCE, strategyType: offering.strategyType }),
   };
 }
 
-/** The Stripe Price an item should be, or `{ skip: reason }` when it gets none. */
-export function desiredPrice(item, strategy, today) {
-  if (displayModeFor(strategy) === 'HIDE') return { skip: 'strategy_hidden' };
-  if (!isLive(strategy, today)) return { skip: 'strategy_inactive' };
-  if (item.isOnRequest === true) return { skip: 'on_request' };
-  if (item.annualFeeEur === null || item.annualFeeEur === undefined || item.annualFeeEur === '') return { skip: 'no_amount' };
-  const unitAmount = toCents(item.annualFeeEur);
+/** The Stripe Price a price point should be, or `{ skip: reason }` when it gets none. */
+export function desiredPrice(point, offering, today) {
+  if (hidesAmounts(offering)) return { skip: 'offering_hidden' };
+  if (!isLive(offering, today)) return { skip: 'offering_inactive' };
+  if (point.isLegacy === true) return { skip: 'legacy' };
+  // Seats are bought once, not subscribed: the yearly price below would bill them every year.
+  if (offering.strategyType === 'PER_SEAT') return { skip: 'per_seat_not_synced' };
+  if (point.isOnRequest === true) return { skip: 'on_request' };
+  if (point.annualFeeEur === null || point.annualFeeEur === undefined || point.annualFeeEur === '') return { skip: 'no_amount' };
+  const unitAmount = toCents(point.annualFeeEur);
   if (!Number.isFinite(unitAmount) || unitAmount < 0) return { skip: 'invalid_amount' };
   return {
-    lookupKey: item.correlationId,
-    productId: strategy.correlationId,
+    lookupKey: point.correlationId,
+    productId: offering.offeringCode,
     unitAmount,
     currency: STRIPE_CURRENCY,
     interval: PRICE_INTERVAL,
-    nickname: item.name,
+    nickname: point.name,
     active: true,
     metadata: present({
-      correlationId: item.correlationId,
+      correlationId: point.correlationId,
       source: STRIPE_SOURCE,
-      tier: item.tier,
-      productLine: item.productLine,
-      displayMode: displayModeFor(strategy),
-      highlighted: item.isHighlighted === true ? 'true' : undefined,
+      tier: point.tier,
+      offeringCode: offering.offeringCode,
+      displayFormat: displayFormatFor(offering),
+      highlighted: point.isHighlighted === true ? 'true' : undefined,
     }),
   };
 }
 
 /**
- * Which strategies and items one request covers. No filter: every live
- * strategy. `strategyId` / `correlationIds` pick strategies by CRM id or
- * correlationId; a correlationId that names an item selects that item's
- * strategy but only that item.
+ * Which offerings and price points one request covers. No filter: every live
+ * offering. `offeringId` / `correlationIds` pick offerings by CRM id or
+ * offeringCode; a correlationId that names a price point selects that point's
+ * offering but only that point.
  */
-export function planSync(strategies, items, { strategyId, correlationIds } = {}, today = new Date().toISOString().slice(0, 10)) {
+export function planSync(offerings, pricePoints, { offeringId, correlationIds } = {}, today = new Date().toISOString().slice(0, 10)) {
   const wanted = new Set(correlationIds ?? []);
-  const filtered = Boolean(strategyId) || wanted.size > 0;
+  const filtered = Boolean(offeringId) || wanted.size > 0;
   const products = [];
   const prices = [];
   /** @type {Array<{ correlationId: string, reason: string }>} */
   const skipped = [];
 
-  const byStrategy = new Map();
-  for (const item of items) {
-    const list = byStrategy.get(item.strategyId) ?? [];
-    list.push(item);
-    byStrategy.set(item.strategyId, list);
+  const byOffering = new Map();
+  for (const point of pricePoints) {
+    const list = byOffering.get(point.offeringId) ?? [];
+    list.push(point);
+    byOffering.set(point.offeringId, list);
   }
   const bySortOrder = (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
 
-  for (const strategy of [...strategies].sort(bySortOrder)) {
-    if (!strategy.correlationId) continue; // nothing to key the Stripe product on
-    const strategyItems = (byStrategy.get(strategy.id) ?? []).sort(bySortOrder);
-    let covered = strategyItems;
+  for (const offering of [...offerings].sort(bySortOrder)) {
+    if (!offering.offeringCode) continue; // nothing to key the Stripe product on
+    const points = (byOffering.get(offering.id) ?? []).sort(bySortOrder);
+    let covered = points;
     if (filtered) {
-      const whole = strategy.id === strategyId || wanted.has(strategy.correlationId);
-      const named = strategyItems.filter((i) => wanted.has(i.correlationId));
+      const whole = offering.id === offeringId || wanted.has(offering.offeringCode);
+      const named = points.filter((p) => wanted.has(p.correlationId));
       if (!whole && named.length === 0) continue;
       if (!whole) covered = named;
-    } else if (!isLive(strategy, today)) {
+    } else if (!isLive(offering, today)) {
       continue;
     }
 
-    products.push({ strategyId: strategy.id, ...desiredProduct(strategy, today) });
-    for (const item of covered) {
-      if (!item.correlationId) {
-        skipped.push({ correlationId: String(item.name ?? item.id), reason: 'no_correlation_id' });
+    products.push({ offeringId: offering.id, ...desiredProduct(offering, today) });
+    for (const point of covered) {
+      if (!point.correlationId) {
+        skipped.push({ correlationId: String(point.name ?? point.id), reason: 'no_correlation_id' });
         continue;
       }
-      const price = desiredPrice(item, strategy, today);
-      if ('skip' in price) skipped.push({ correlationId: item.correlationId, reason: String(price.skip) });
+      const price = desiredPrice(point, offering, today);
+      if ('skip' in price) skipped.push({ correlationId: point.correlationId, reason: String(price.skip) });
       else prices.push(price);
     }
   }

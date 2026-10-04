@@ -1,16 +1,18 @@
 /**
  * sync-pricing-to-stripe — REST sidecar (F0.3b) Lambda, C2. POST
- * `{ strategyId?, correlationIds[]? }` with bearer OPS_TOKEN; ops/sync-to-stripe.mjs
+ * `{ offeringId?, correlationIds[]? }` with bearer OPS_TOKEN; ops/sync-to-stripe.mjs
  * calls it, and it can be triggered after any pricing change.
  *
- * Reads the CRM's PricingStrategies and PriceItems (no filter: every live
- * strategy) and makes Stripe match. The CRM is the source of truth:
- *   - each strategy → a Product, id = strategy.correlationId; a HIDE strategy
- *     (or one outside its validity window) is `active: false`;
- *   - each item → a recurring yearly Price in EUR cents (annualFeeEur × 100),
- *     lookup_key = item.correlationId, on its strategy's Product. An on-request
- *     item, and any item of a HIDE / inactive strategy, gets no price;
- *   - tier, product line, D3 display mode and `highlighted` go in metadata.
+ * Reads the CRM's Offerings and PricePoints (no filter: every live
+ * offering) and makes Stripe match. The CRM is the source of truth:
+ *   - each offering → a Product, id = offering.offeringCode; an offering that
+ *     shows no amount (CONTACT_CTA / HIDDEN / QUOTE_ONLY), or is outside its
+ *     validity window, is `active: false`;
+ *   - each price point → a recurring yearly Price in EUR cents (annualFeeEur ×
+ *     100), lookup_key = pricePoint.correlationId, on its offering's Product.
+ *     An on-request or legacy price point, any point of a hidden / inactive
+ *     offering, and PER_SEAT points (bought once, not subscribed), get no price;
+ *   - tier, offering code, display format and `highlighted` go in metadata.
  *
  * Idempotent: Stripe is read first and only what differs is written, so the
  * same input twice leaves the same state (the second run reports `unchanged`).
@@ -22,7 +24,7 @@
  * changes[] }`; `changes` lists each product / price with what was done.
  *
  * Env: TWENTY_API_URL, TWENTY_API_KEY (an API key whose role can read
- * pricingStrategies / priceItems), STRIPE_SECRET_KEY, OPS_TOKEN.
+ * offerings / pricePoints), STRIPE_SECRET_KEY, OPS_TOKEN.
  */
 import { z } from 'zod';
 
@@ -44,8 +46,8 @@ import { json, readAuthorisedJson, type HttpEvent, type HttpResult } from './lib
 // ------------------------------------------------------------------ payload
 
 export const SyncPayload = z.object({
-  strategyId: z.uuid().optional(),
-  /** Strategy or price-item correlationIds; empty or absent = every live strategy. */
+  offeringId: z.uuid().optional(),
+  /** Offering codes or price-point correlationIds; empty or absent = every live offering. */
   correlationIds: z.array(z.string().trim().min(1).max(200)).max(200).optional(),
 });
 export type SyncPayload = z.infer<typeof SyncPayload>;
@@ -154,8 +156,8 @@ export async function syncPricingToStripe(
 ): Promise<SyncResult> {
   if (!stripe) throw new SyncError('stripe_not_configured', 503);
 
-  const [strategies, items] = await Promise.all([findAllRecords(config, 'pricingStrategies'), findAllRecords(config, 'priceItems')]);
-  const plan = planSync(strategies as never, items as never, p, now.toISOString().slice(0, 10));
+  const [offerings, pricePoints] = await Promise.all([findAllRecords(config, 'offerings'), findAllRecords(config, 'pricePoints')]);
+  const plan = planSync(offerings as never, pricePoints as never, p, now.toISOString().slice(0, 10));
 
   const changes: Change[] = [];
   let at = '';
