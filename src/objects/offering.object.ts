@@ -148,5 +148,14 @@ export default defineObject({
       targetObjectId: IDS.competitorPriceObservation.object,
       inverseFieldId: IDS.competitorPriceObservation.fields.offering,
     }),
+    oneToMany({
+      universalIdentifier: F.opportunityLines,
+      name: 'opportunityLines',
+      label: 'Opportunity lines · 商机明细',
+      icon: 'IconListDetails',
+      description: 'Opportunity lines quoting this offering',
+      targetObjectId: IDS.opportunityLine.object,
+      inverseFieldId: IDS.opportunityLine.fields.offering,
+    }),
   ],
 });

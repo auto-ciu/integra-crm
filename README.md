@@ -57,6 +57,7 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── ops/generate-all-digests.mjs     B2: one AI digest per active ProductStream via generate-stream-digest (weekly, --dry-run)
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
 ├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
+├── ops/seed-stream-stages.mjs       B2: the standard 5 StreamStages per ProductStream (idempotent, --dry-run)
 ├── ops/seed-pricing.mjs             creates missing offerings, price points + bundle items from shared/public-pricing.mjs
 ├── ops/publish-pricing.mjs          live pricing → validated pricing.json for the website, records a PricingPublication (.github/workflows/publish-pricing.yml)
 ├── ops/discover-leads.mjs           A2: start an Apify LinkedIn company run via run-linkedin-discovery (--dry-run, --wait)
@@ -118,6 +119,8 @@ SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --conf
 | Product Stream | new | name, slug (unique), description, icon, sortOrder, isActive, activeUpdateCount + lastUpdateAt (denormalised, not yet computed), updates, documents, contacts |
 | Stream Update | new | title (`name`), stream→, body, updateType, publishedAt, sourceUrl |
 | Stream Document | new | title (`name`), stream→, file, version, effectiveDate, documentType |
+| Stream Stage | new | name, stream→, stageName, order, isDefault, description |
+| Opportunity Line | new | name, opportunity→, stream→, stage→, offering→, estimatedValueEur, probability, expectedCloseDate, notes, isActive |
 | Stream Contact | new | name, stream→, person→, role, notes |
 | Fair Lead | new | scanId (unique, label), person→, company→, companyName, source, productInterest (multi), notes, businessCardImage, followUpStatus, capturedAt, score, scoreBreakdown, scoredAt |
 | Offering | new | name, offeringCode (unique), productCategory, strategyType, displayFormat, fromPrefix, hasOptionalExtras, isActive, description, features (rich text), validFrom, validUntil, sortOrder, pricePoints, bundleItems, componentOf |

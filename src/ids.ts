@@ -63,6 +63,8 @@ export const IDS = {
     fields: {
       productLine: '5d6e7f80-11b2-4c3d-8e4f-506172839405',
       tier: '5d6e7f80-22b2-4d3e-9f50-617283940516',
+      /** inverse of opportunityLine.opportunity */
+      opportunityLines: '3398e3d0-465c-4a07-a902-8564e88f61cd',
       /** inverse of enquiry.relatedOpportunity */
       enquiries: 'dbd1e3a1-0d87-4975-8b76-95bbae85c67d',
       /** Fair the opportunity came from (B1; free text until F0.5's leadSource select) */
@@ -212,10 +214,44 @@ export const IDS = {
       documents: '6a0a7307-bd71-45bf-b683-5a0154c442c3',
       /** inverse of streamContact.stream */
       contacts: '7923cde6-6833-4beb-bbed-2f35a7a2585e',
+      /** inverse of streamStage.stream */
+      stages: '8aadaeea-90e7-422e-ac56-4a2f7aa13aa2',
+      /** inverse of opportunityLine.stream */
+      opportunityLines: 'ac502c37-ac48-4a10-ad3c-05a6f0547036',
       /** inverse of discoveredCompany.recommendedStream */
       discoveredCompanies: '453955ec-354c-48b1-bf46-4a3bbd23f790',
       /** inverse of competitor.competitorOf */
       competitors: 'f8569c39-fb56-4b47-ae66-19f0d182cd7a',
+    },
+  },
+
+  streamStage: {
+    object: 'fa89d3da-6625-467a-b568-aa65bc19e92f',
+    fields: {
+      name: '45dfbded-ece9-4930-a466-7ce8c5678c62',
+      stream: 'e93dcf5d-88b7-45f0-9777-5e431375121c',
+      stageName: '19c9ac27-1343-419f-ab6c-a3b3cb5afd8b',
+      order: '6708f03c-6ba7-4a2f-9d7f-2ce1b7f71d3c',
+      isDefault: 'ee8b3291-ab78-4620-ae8f-c2be42291a32',
+      description: '3e5b7635-c3ee-493f-ba70-39feb46c1903',
+      /** inverse of opportunityLine.stage */
+      opportunityLines: '038bf8b2-8c2a-470d-8c80-6818a1e091d0',
+    },
+  },
+
+  opportunityLine: {
+    object: 'ada7e137-5828-4bf5-ac90-718d146966d0',
+    fields: {
+      name: 'bf85b857-449c-4170-b2d4-2531cae6fadb',
+      opportunity: '53bb870e-de7c-420a-82d7-14350cf95441',
+      stream: 'ca5efe5b-2269-4665-b170-d40493617a63',
+      stage: '4c8a596f-99c4-42ae-9691-000c568b3985',
+      offering: '682c515d-0b05-45ec-bccc-78070700c2fe',
+      estimatedValueEur: '807d088e-c390-4d4a-97b3-aa43df6e6e27',
+      probability: '0b755944-d893-4184-abc6-8aaca53030b9',
+      expectedCloseDate: '827ed4e0-c57a-4b5c-8027-05d1f5dfe6e9',
+      notes: '3aea1299-c58c-4db9-bb72-586ec9638fa9',
+      isActive: 'be1fc1ce-bce6-4c7f-b9ab-369cb28bf843',
     },
   },
 
@@ -297,6 +333,8 @@ export const IDS = {
       pricePoints: '05eafecd-0f84-423b-84f4-ce6cdc50611e',
       /** inverse of bundleItem.bundle */
       bundleItems: '6a7e5aa1-c4fb-4250-8eca-7fc5f38967eb',
+      /** inverse of opportunityLine.offering */
+      opportunityLines: 'e22222c1-b126-4ce3-ba70-843d4d95ac02',
       /** inverse of bundleItem.component */
       componentOf: '16572dd0-07d5-4b22-9215-f3c04bf7340f',
       /** inverse of competitorPriceObservation.offering */
@@ -770,6 +808,64 @@ export const IDS = {
         '7c28b39d-5f3b-47b2-a132-b7d40220ddc8',
       ],
     },
+    streamStagesTable: {
+      view: 'a50d0fb8-c3ad-41dc-8d12-a6da15aa6275',
+      fields: [
+        '05f135df-3ba6-4de7-8fd1-ffe617c67c4b',
+        '35c10bab-810b-4703-93e8-081f9f9b4cd3',
+        '9bce1276-dea7-46b1-82f8-d1da49ec210f',
+      ],
+      sort: 'e3a2c21a-8c66-47cf-b9cc-cdf2a7d2e990',
+    },
+    opportunityLinesTable: {
+      view: 'c5d13d22-bb00-41d3-aa3f-390b6316551b',
+      fields: [
+        '0072c2a0-9145-4a11-952f-3ea62489e469',
+        'b815f6d7-435d-4ae2-b54d-bacf129a58fa',
+        'b45fc6b4-682d-4011-b8ba-1ec680ad7a43',
+        '5af56c29-b645-454c-b4c7-dfea2a285f29',
+        '768e8294-ab3c-4d38-9df6-c6dc016d9360',
+        '1414e4e7-4b40-48c4-9775-504203e951e7',
+        '4d4a725e-4ac8-49b2-b422-21801e1ddb2a',
+      ],
+      sort: '680f96dd-adfd-4b4a-8afe-827c2abfbdd0',
+    },
+    streamStageOverviewFields: {
+      view: '0a345354-d85e-4fa2-8b03-7c6b735bd57e',
+      fields: [
+        '89f41a29-b8b6-49f2-a197-640f8e57c77f',
+        'd4f856b7-3015-4b07-ae15-6d339ae55d1b',
+        '3317014f-d1d2-4ff5-a34c-2916b68f7721',
+        'f1b769c9-7107-4293-a4b7-2bf1a602421d',
+        '1e52c345-abd4-4df6-be7e-0db969fc921d',
+        '5c243fed-f7dc-4987-af36-fb92b204c3ba',
+      ],
+    },
+    opportunityLineOverviewFields: {
+      view: 'bbe991cf-0463-44c3-acc0-8b65ae265b41',
+      fields: [
+        'c1230bd5-18d4-4528-a563-11fa962ea81c',
+        '77aafacd-e7ba-4108-a7eb-b1f9906cf033',
+        'f40797b6-3f15-426a-b677-e119300cff46',
+        '689ce516-61d7-44b1-9b95-fdba47961203',
+        '1941711d-a79a-42e1-850d-9304912e1baa',
+        'f5682229-a261-43f8-8c0d-f7c31d5c4414',
+        'e77e5f8e-43d3-4da1-9a6f-22ceed88e450',
+        '16bd4089-3379-4408-ba06-d2b64f5e6b57',
+        'cde707a0-c076-480d-92ba-1a5061d1e323',
+        'bb99bbba-e675-4cf9-9006-93dd5194d386',
+      ],
+    },
+    streamOpportunityLinesWidget: {
+      view: '45b8097a-8e63-41dd-946f-0004e355342a',
+      fields: [
+        'c49f466c-cc1b-4848-b3b9-85144b4928c9',
+        '9f221563-d5d6-4bbc-aec8-74fcb57d9536',
+        'cc93c050-8d72-43da-883b-01c3b68cd5d7',
+        '262021ec-a2af-4d2b-b849-03798b489b74',
+        'e6a4e1f6-374a-44e9-ae39-a3e5bcc1aa83',
+      ],
+    },
     offeringsTable: {
       view: '9137b476-a497-470f-8f1f-2af09d1799e2',
       fields: [
@@ -990,6 +1086,7 @@ export const IDS = {
 
   frontComponents: {
     renewalBanner: '3d4e5f60-0001-4dde-a9f4-05162738495a',
+    streamKpiWidget: '40e0715c-b74f-4317-b61b-c5c6a9dd5d77',
     renewalCountWidget: '3d4e5f60-0002-4edf-ba05-162738495a6b',
     promoteToLeadButton: 'd736dec8-98e6-4e3f-9798-8983c93d700c',
     pricingDisplay: 'c62acce9-9a0d-441b-a6d7-46604fc14f0a',
@@ -1045,13 +1142,26 @@ export const IDS = {
         updates: '2a6c4872-3410-4dba-9d2c-0c60b89f5761',
         documents: '2caf255a-ed5f-4bc8-acb3-525f1c72c5df',
         contacts: '7b706771-355d-4c8e-9bbf-fe9e4ca94f2a',
+        pipeline: '31ef5e15-7680-4003-8ea1-7333cb77da8e',
       },
       widgets: {
         overviewFields: '290a004d-6c6c-4464-8f5e-6e2e11aa7937',
         updates: 'a66684ab-ffe8-4be8-abf9-95bf79eeadda',
         documents: 'c4c7ceb5-e540-4d2d-bf83-65100ab15fc2',
         contacts: '89324e93-99f5-4b46-9923-60635538d353',
+        streamKpi: 'df984a1c-e4ca-4b2b-ae25-bd7321bc015a',
+        opportunityLines: '0f6d783f-29b0-4018-b04e-2d05c17a2c9f',
       },
+    },
+    streamStageRecord: {
+      layout: '56dd0f3d-ade2-4cdb-913f-dfc0a322ab9d',
+      tabs: { overview: '7df6bc81-c165-4214-ae45-10c8597cc1e5' },
+      widgets: { overviewFields: '23c396f6-5a06-4ab4-ad23-fc41dd4892b3' },
+    },
+    opportunityLineRecord: {
+      layout: 'e83cee42-fbc7-462a-bfdb-3c944694fe5b',
+      tabs: { overview: '0c7b865c-7fb6-4de3-a116-61efb97659d8' },
+      widgets: { overviewFields: 'e1ad4efd-20f2-48dc-ac6a-f6cc43f01b65' },
     },
     offeringRecord: {
       layout: '6749a7ec-d843-42ec-a5a2-cc8bd482cd85',
@@ -1099,6 +1209,7 @@ export const IDS = {
     authorities: '60718293-0004-43f4-8f5a-6b7c8d9eafb0',
     enquiries: '0ddf4836-2b27-4fb2-9276-d1658e37714c',
     productStreams: '6fdbe905-ea65-4ee3-af3d-7d7d6e4b72c3',
+    streamStages: '8fbdc930-2e06-4f36-876a-61ac59b343ea',
     pricing: '506d3e76-f244-41e7-a77b-7d1dce1e395f',
     leadDiscovery: 'b85ea1d6-f8cd-460c-8491-5e66a540c065',
     portalEvents: '9c08b4b3-230b-40be-b966-d41c742efef5',

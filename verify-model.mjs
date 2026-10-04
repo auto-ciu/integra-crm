@@ -64,6 +64,9 @@
  *      fields exist, the import / enrichment / Safety Gate / GDPR Art.14
  *      functions exist with their budgets, dedupe keys, row mapping, risk
  *      levels and the Art.14 notice behave as specified.
+ *  22. B2 stream pipeline: StreamStage + OpportunityLine objects, linked to
+ *      ProductStream / Opportunity / Offering both ways; the standard five
+ *      stages; stream KPI maths; Pipeline tab, views, nav.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -87,6 +90,7 @@ const EXPECTED_OBJECTS = [
   'LeadDiscoveryRun', 'DiscoveredCompany', 'LeadImport',
   'TrainingRegistration',
   'CustomerEvent', 'ResearchBrief', 'ResearchReport', 'ResearchFinding', 'Competitor', 'CompetitorPriceObservation',
+  'StreamStage', 'OpportunityLine',
 ];
 
 const failures = [];
@@ -375,7 +379,7 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   // Object structure, from the source: every plan field is declared, by name.
   const PLAN_FIELDS = {
-    'src/objects/offering.object.ts': ['name', 'offeringCode', 'productCategory', 'strategyType', 'displayFormat', 'fromPrefix', 'hasOptionalExtras', 'isActive', 'description', 'features', 'validFrom', 'validUntil', 'sortOrder', /* relation inverses: */ 'pricePoints', 'bundleItems', 'componentOf', 'competitorObservations'],
+    'src/objects/offering.object.ts': ['name', 'offeringCode', 'productCategory', 'strategyType', 'displayFormat', 'fromPrefix', 'hasOptionalExtras', 'isActive', 'description', 'features', 'validFrom', 'validUntil', 'sortOrder', /* relation inverses: */ 'pricePoints', 'bundleItems', 'componentOf', 'competitorObservations', 'opportunityLines'],
     'src/objects/price-point.object.ts': ['name', 'correlationId', 'offering', 'tier', 'annualFeeEur', 'setupFeeEur', 'currencyCode', 'isHighlighted', 'isOnRequest', 'isLegacy', 'sortOrder', 'description'],
     'src/objects/bundle-item.object.ts': ['name', 'bundle', 'component', 'included', 'sortOrder'],
     'src/objects/pricing-publication.object.ts': ['name', 'publishedAt', 'version', 'publishedBy', 'commitSha', 'isLive', 'notes'],
@@ -1158,6 +1162,77 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`A2 lead import + enrichment: ${problems.join('; ')}`);
   else ok(`A2 lead import + enrichment: LeadImport (${imp.length} fields) + ${A2_FIELDS.length} new DiscoveredCompany fields (${KEPT_FIELDS.length} kept); ${FUNCTIONS.length} functions; budgets $${li.ENRICHMENT_BUDGET_USD}/$${li.SAFETY_CHECK_BUDGET_USD}; dedupe keys, row mapping, SSRF guard, risk levels, ICP tiers, Art.14 notice`);
+}
+
+// ------------------------------------------------- 22. B2 stream pipeline
+{
+  const problems = [];
+  const k = await import(pathToFileURL(join(ROOT, 'shared/stream-kpis.mjs')).href);
+  const fieldNames = (file) => [...stripComments(read(file)).matchAll(/\bname: '([A-Za-z]+)',\s*\n\s*label:/g)].map((m) => m[1]);
+  const need = (file, names) => {
+    const declared = fieldNames(file);
+    const missing = names.filter((n) => !declared.includes(n));
+    if (missing.length) problems.push(`${file}: fields missing [${missing}]`);
+  };
+
+  // Objects and their fields.
+  need('src/objects/stream-stage.object.ts', ['name', 'stream', 'stageName', 'order', 'isDefault', 'description', 'opportunityLines']);
+  need('src/objects/opportunity-line.object.ts', ['name', 'opportunity', 'stream', 'stage', 'offering', 'estimatedValueEur', 'probability', 'expectedCloseDate', 'notes', 'isActive']);
+
+  // Stages are linked: each relation's inverse is declared on the other side.
+  const linked = [
+    ['src/objects/stream-stage.object.ts', 'IDS.productStream.fields.stages', 'streamStage.stream → productStream.stages'],
+    ['src/objects/product-stream.object.ts', 'IDS.streamStage.fields.stream', 'productStream.stages ← streamStage.stream'],
+    ['src/objects/opportunity-line.object.ts', 'IDS.streamStage.fields.opportunityLines', 'opportunityLine.stage → streamStage.opportunityLines'],
+    ['src/objects/stream-stage.object.ts', 'IDS.opportunityLine.fields.stage', 'streamStage.opportunityLines ← opportunityLine.stage'],
+    ['src/objects/opportunity-line.object.ts', 'IDS.productStream.fields.opportunityLines', 'opportunityLine.stream → productStream.opportunityLines'],
+    ['src/objects/product-stream.object.ts', 'IDS.opportunityLine.fields.stream', 'productStream.opportunityLines ← opportunityLine.stream'],
+    ['src/objects/opportunity-line.object.ts', 'IDS.opportunity.fields.opportunityLines', 'opportunityLine.opportunity → opportunity.opportunityLines'],
+    ['src/objects/opportunity/opportunity-lines.field.ts', 'IDS.opportunityLine.fields.opportunity', 'opportunity.opportunityLines ← opportunityLine.opportunity'],
+    ['src/objects/opportunity-line.object.ts', 'IDS.offering.fields.opportunityLines', 'opportunityLine.offering → offering.opportunityLines'],
+    ['src/objects/offering.object.ts', 'IDS.opportunityLine.fields.offering', 'offering.opportunityLines ← opportunityLine.offering'],
+  ];
+  for (const [file, needle, what] of linked) if (!read(file).includes(needle)) problems.push(`relation not linked: ${what}`);
+
+  // Standard stages: five, in order, 1..5.
+  const want = ['Awareness', 'Interest', 'Evaluation', 'Negotiation', 'Closed Won'];
+  if (JSON.stringify(k.STANDARD_STAGES.map((s) => s.stageName)) !== JSON.stringify(want)) problems.push('STANDARD_STAGES must be Awareness, Interest, Evaluation, Negotiation, Closed Won');
+  if (k.STANDARD_STAGES.some((s, i) => s.order !== i + 1)) problems.push('STANDARD_STAGES order must be 1..5');
+  const seed = read('ops/seed-stream-stages.mjs');
+  if (!seed.includes('STANDARD_STAGES') || !seed.includes('productStreams') || !seed.includes('existing.has')) problems.push('ops/seed-stream-stages.mjs must seed STANDARD_STAGES per productStream, skipping existing');
+
+  // KPI maths (2026-10-04 is in Q4: 2026-10-01 ≤ d < 2027-01-01).
+  const today = new Date('2026-10-04T12:00:00Z');
+  const line = (o, stage, order, value, prob, close, isActive = true) => ({ opportunityId: o, stageName: stage, stageOrder: order, estimatedValueEur: value, probability: prob, expectedCloseDate: close, isActive });
+  const r = k.computeStreamKpis([
+    line('o1', 'Interest', 2, 10000, 50, '2026-11-15'),
+    line('o1', 'Evaluation', 3, 4000, 25, '2027-01-01'),
+    line('o2', 'Interest', 2, 2000, 100, '2026-12-31'),
+    line('o3', 'Awareness', 1, 99999, 100, '2026-10-10', false),
+    line('o4', 'Negotiation', 4, null, null, null),
+  ], today);
+  if (r.pipelineValueEur !== 8000) problems.push(`pipelineValueEur ${r.pipelineValueEur} ≠ 8000`);
+  if (r.openOpportunities !== 3) problems.push(`openOpportunities ${r.openOpportunities} ≠ 3`);
+  if (r.expectedThisQuarterEur !== 7000) problems.push(`expectedThisQuarterEur ${r.expectedThisQuarterEur} ≠ 7000`);
+  if (r.dealsByStage.map((s) => `${s.stageName}:${s.count}`).join() !== 'Interest:2,Evaluation:1,Negotiation:1') problems.push(`dealsByStage ${JSON.stringify(r.dealsByStage)}`);
+  if (JSON.stringify(k.quarterBounds(new Date('2026-12-31T23:00:00Z'))) !== JSON.stringify({ start: '2026-10-01', end: '2027-01-01' })) problems.push('quarterBounds Q4 wrong');
+  if (k.computeStreamKpis([], today).pipelineValueEur !== 0) problems.push('empty stream must be 0');
+
+  // Views, layouts, nav.
+  for (const f of ['stream-stages-table', 'opportunity-lines-table']) if (!/type: ViewType\.TABLE,/.test(read(`src/views/${f}.view.ts`))) problems.push(`${f} must be a TABLE view`);
+  const stageView = read('src/views/stream-stages-table.view.ts');
+  for (const f of ['stageName', 'order', 'isDefault']) if (!stageView.includes(`S.${f}`)) problems.push(`stream-stages-table lacks ${f}`);
+  const lineView = read('src/views/opportunity-lines-table.view.ts');
+  for (const f of ['opportunity', 'stream', 'stage', 'offering', 'estimatedValueEur', 'probability', 'expectedCloseDate']) if (!lineView.includes(`L.${f},`)) problems.push(`opportunity-lines-table lacks ${f}`);
+  for (const f of ['stream-stage-record', 'opportunity-line-record']) if (!read(`src/page-layouts/${f}.page-layout.ts`).includes("title: 'Overview'")) problems.push(`${f} page layout lacks the Overview tab`);
+  const streamLayout = read('src/page-layouts/product-stream-record.page-layout.ts');
+  if (!streamLayout.includes("title: 'Pipeline'") || !streamLayout.includes('IDS.frontComponents.streamKpiWidget') || !streamLayout.includes('IDS.views.streamOpportunityLinesWidget')) problems.push("product-stream page layout needs a 'Pipeline' tab with StreamKpiWidget + opportunity lines table");
+  if (!/type: ViewType\.TABLE_WIDGET/.test(read('src/views/stream-opportunity-lines.view.ts'))) problems.push('stream-opportunity-lines must be a TABLE_WIDGET view');
+  if (!read('src/navigation/stream-stages.nav.ts').includes('IDS.views.streamStagesTable.view')) problems.push('Stream Stages nav must open the Stream Stages table');
+  if (!read('src/front-components/StreamKpiWidget.tsx').includes('fetchStreamLines')) problems.push('StreamKpiWidget must fetch via fetchStreamLines');
+
+  if (problems.length) fail(`B2 stream pipeline: ${problems.join('; ')}`);
+  else ok('B2 stream pipeline: StreamStage + OpportunityLine linked both ways to ProductStream / Opportunity / Offering; 5 standard stages seeded per stream; KPI maths (weighted value, open opps, by stage, this quarter); Pipeline tab, 2 tables, 2 layouts, nav');
 }
 
 // ----------------------------------------------------------------- report

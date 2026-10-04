@@ -1,9 +1,11 @@
 /**
- * Product Stream record page: Overview / Updates / Documents / Contacts.
+ * Product Stream record page: Overview / Updates / Documents / Contacts / Pipeline.
  *
  * Overview is a FIELDS widget (views/stream-overview-fields.view.ts); the
  * other three are RECORD_TABLE widgets over the stream's children, each with
  * its own TABLE_WIDGET view (views/stream-{detail,documents,contacts}.view.ts).
+ * Pipeline is the StreamKpiWidget over the stream's opportunity lines
+ * (views/stream-opportunity-lines.view.ts).
  */
 import {
   definePageLayout,
@@ -16,6 +18,7 @@ import { IDS } from '../ids';
 
 const L = IDS.pageLayouts.productStreamRecord;
 
+const FIT = PageLayoutWidgetVerticalListHeightBehavior.FIT_CONTENT;
 const FILL = PageLayoutWidgetVerticalListHeightBehavior.TAB_VIEWPORT;
 
 export default definePageLayout({
@@ -98,6 +101,36 @@ export default definePageLayout({
           configuration: {
             configurationType: 'RECORD_TABLE',
             viewUniversalIdentifier: IDS.views.streamContactsWidget.view,
+          },
+          heightBehavior: FILL,
+        },
+      ],
+    },
+    {
+      universalIdentifier: L.tabs.pipeline,
+      title: 'Pipeline',
+      icon: 'IconListDetails',
+      position: 4,
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier: L.widgets.streamKpi,
+          title: 'Stream KPIs',
+          type: WidgetType.FRONT_COMPONENT,
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier: IDS.frontComponents.streamKpiWidget,
+          },
+          heightBehavior: FIT,
+        },
+        {
+          universalIdentifier: L.widgets.opportunityLines,
+          title: 'Opportunity Lines',
+          type: WidgetType.RECORD_TABLE,
+          objectUniversalIdentifier: IDS.opportunityLine.object,
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewUniversalIdentifier: IDS.views.streamOpportunityLinesWidget.view,
           },
           heightBehavior: FILL,
         },
