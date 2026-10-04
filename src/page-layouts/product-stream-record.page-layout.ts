@@ -1,11 +1,15 @@
 /**
- * Product Stream record page: Overview / Updates / Documents / Contacts / Pipeline.
+ * Product Stream record page: Overview / Updates / Documents / Contacts / Pipeline /
+ * Competitive Intel.
  *
  * Overview is a FIELDS widget (views/stream-overview-fields.view.ts); the
  * other three are RECORD_TABLE widgets over the stream's children, each with
  * its own TABLE_WIDGET view (views/stream-{detail,documents,contacts}.view.ts).
  * Pipeline is the StreamKpiWidget over the stream's opportunity lines
- * (views/stream-opportunity-lines.view.ts).
+ * (views/stream-opportunity-lines.view.ts). Updates also starts with the
+ * StreamContentWidget (published content). Competitive Intel is the stream's
+ * competitors table (views/stream-competitors.view.ts) plus the
+ * CompetitiveIntelWidget (latest price observations).
  */
 import {
   definePageLayout,
@@ -53,6 +57,16 @@ export default definePageLayout({
       position: 1,
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
+        {
+          universalIdentifier: L.widgets.streamContent,
+          title: 'Published content',
+          type: WidgetType.FRONT_COMPONENT,
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier: IDS.frontComponents.streamContentWidget,
+          },
+          heightBehavior: FIT,
+        },
         {
           universalIdentifier: L.widgets.updates,
           title: 'Updates',
@@ -133,6 +147,36 @@ export default definePageLayout({
             viewUniversalIdentifier: IDS.views.streamOpportunityLinesWidget.view,
           },
           heightBehavior: FILL,
+        },
+      ],
+    },
+    {
+      universalIdentifier: L.tabs.competitiveIntel,
+      title: 'Competitive Intel',
+      icon: 'IconSwords',
+      position: 5,
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier: L.widgets.competitors,
+          title: 'Competitors',
+          type: WidgetType.RECORD_TABLE,
+          objectUniversalIdentifier: IDS.competitor.object,
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewUniversalIdentifier: IDS.views.streamCompetitorsWidget.view,
+          },
+          heightBehavior: FILL,
+        },
+        {
+          universalIdentifier: L.widgets.competitiveIntel,
+          title: 'Latest price observations',
+          type: WidgetType.FRONT_COMPONENT,
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier: IDS.frontComponents.competitiveIntelWidget,
+          },
+          heightBehavior: FIT,
         },
       ],
     },
