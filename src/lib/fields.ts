@@ -112,6 +112,23 @@ export const select = ({
   defaultValue: defaultValue === undefined || defaultValue === null ? null : `'${defaultValue}'`,
 });
 
+export const multiSelect = ({ options, ...f }: Base & { options: SelectOption[] }) => ({
+  ...f,
+  type: FieldType.MULTI_SELECT as const,
+  isNullable: true as const,
+  options,
+  defaultValue: null,
+});
+
+/** One URL (Twenty's LINKS composite; secondary links unused). */
+export const link = (f: Base) => ({
+  ...f,
+  type: FieldType.LINKS as const,
+  isNullable: true as const,
+  // Composite default, sub-values quoted like the currency default above.
+  defaultValue: { primaryLinkLabel: "''", primaryLinkUrl: "''", secondaryLinks: null },
+});
+
 /**
  * MANY_TO_ONE side of a relation (this object holds `<name>Id`). The inverse
  * ONE_TO_MANY field must exist on the target object with `inverseFieldId` as

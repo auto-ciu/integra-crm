@@ -18,11 +18,20 @@ export const PROVINCE = options([
   ['OTHER', 'Other · 其他', 'gray'],
 ]);
 
+/**
+ * One value per product stream (shared/streams.mjs seeds a ProductStream for
+ * each; verify-model.mjs keeps the two in step). Also FairLead.productInterest
+ * and the A1 fair-lead score weights (shared/scoring.mjs).
+ */
 export const PRODUCT_CATEGORY = options([
   ['BATTERY_LI_ION', 'Battery — Li-ion · 锂离子电池', 'blue'],
   ['BATTERY_LMT', 'Battery — LMT · 轻型交通工具电池', 'sky'],
   ['TEXTILES', 'Textiles · 纺织品', 'purple'],
   ['ELECTRONICS', 'Electronics · 电子产品', 'turquoise'],
+  ['FURNITURE', 'Furniture · 家具', 'brown'],
+  ['TOYS', 'Toys · 玩具', 'pink'],
+  ['MACHINERY', 'Machinery · 机械', 'orange'],
+  ['MEDICAL_DEVICES', 'Medical Devices · 医疗器械', 'green'],
   ['OTHER', 'Other · 其他', 'gray'],
 ]);
 
@@ -169,6 +178,47 @@ export const MESSAGE_DIRECTION = options([
   ['INBOUND', 'Inbound · 来信', 'blue'],
   ['OUTBOUND', 'Outbound · 回复', 'green'],
   ['NOTE', 'Internal note · 内部备注', 'yellow'],
+]);
+
+// ------------------------------------------------------- B1 product streams
+
+export const STREAM_UPDATE_TYPE = options([
+  ['REGULATORY_UPDATE', 'Regulatory update · 法规更新', 'blue'],
+  ['GUIDANCE', 'Guidance · 指南', 'turquoise'],
+  ['DEADLINE', 'Deadline · 截止日期', 'red'],
+  ['EVENT', 'Event · 活动', 'purple'],
+  ['NEWS', 'News · 新闻', 'gray'],
+]);
+
+export const STREAM_DOCUMENT_TYPE = options([
+  ['REGULATION', 'Regulation · 法规', 'blue'],
+  ['GUIDANCE', 'Guidance · 指南', 'turquoise'],
+  ['TEMPLATE', 'Template · 模板', 'purple'],
+  ['CHECKLIST', 'Checklist · 清单', 'green'],
+  ['REPORT', 'Report · 报告', 'gray'],
+]);
+
+export const STREAM_CONTACT_ROLE = options([
+  ['LEAD', 'Lead · 负责人', 'blue'],
+  ['EXPERT', 'Expert · 专家', 'purple'],
+  ['SUPPORT', 'Support · 支持', 'gray'],
+]);
+
+// ----------------------------------------------------- B1 fair card capture
+
+export const FAIR_LEAD_SOURCE = options([
+  ['CANTON_FAIR_2026', 'Canton Fair 2026 · 2026广交会', 'yellow'],
+  ['CANTON_FAIR_2027', 'Canton Fair 2027 · 2027广交会', 'orange'],
+  ['OTHER_FAIR', 'Other fair · 其他展会', 'purple'],
+  ['WALK_IN', 'Walk-in · 到访', 'green'],
+  ['ONLINE', 'Online · 线上', 'blue'],
+]);
+
+export const FOLLOW_UP_STATUS = options([
+  ['NEW', 'New · 新', 'blue'],
+  ['CONTACTED', 'Contacted · 已联系', 'sky'],
+  ['QUALIFIED', 'Qualified · 已确认', 'green'],
+  ['DISQUALIFIED', 'Disqualified · 不合格', 'gray'],
 ]);
 
 /** Re-exported so views can import stages from the same module as the rest. */

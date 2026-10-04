@@ -25,6 +25,8 @@ export const IDS = {
       trainingEvents: 'c6d7e8f9-0007-48a9-94af-b0c1d2e3f405',
       /** inverse of enquiry.relatedCompany */
       enquiries: '009dc9ed-35ba-4ae7-952c-601646de1a5c',
+      /** inverse of fairLead.company */
+      fairLeads: '9e48010c-03a2-41b2-ae5b-f6495207294e',
     },
   },
 
@@ -38,6 +40,10 @@ export const IDS = {
       leadStatus: '9e0d1c2b-66a3-4051-9283-b4c5d6e7f809',
       /** inverse of enquiry.relatedPerson */
       enquiries: '90a3371a-5168-4b4f-8703-76bcd727386d',
+      /** inverse of fairLead.person */
+      fairLeads: '92c347a1-dec4-4fa5-b940-3317c76dc7c4',
+      /** inverse of streamContact.person */
+      streamContacts: '2e1800e4-f142-46a7-9f1b-46ef4f191408',
     },
   },
 
@@ -47,6 +53,8 @@ export const IDS = {
       tier: '5d6e7f80-22b2-4d3e-9f50-617283940516',
       /** inverse of enquiry.relatedOpportunity */
       enquiries: 'dbd1e3a1-0d87-4975-8b76-95bbae85c67d',
+      /** Fair the opportunity came from (B1; free text until F0.5's leadSource select) */
+      leadSource: '51894b4e-22fd-4cd0-888f-cafb56103b71',
     },
   },
 
@@ -156,6 +164,84 @@ export const IDS = {
       assignTo: 'b2617851-90b7-4698-b9bd-e6b146dd381f',
       isActive: '11bf7576-c046-4c96-8bd7-8a36eb50f503',
       priority: 'e3b3e42b-ece7-4480-9b0d-534f5facac7a',
+    },
+  },
+
+  // ------------------------------------------------ B1 product streams
+
+  productStream: {
+    object: '72859466-4111-4865-9b24-04201b039735',
+    fields: {
+      name: '3c263cec-4d4e-4e05-a7be-0d30181e9a23',
+      slug: '65cbb410-e38e-4ca9-8f1f-e10ff52f99c2',
+      description: '36570756-809f-468c-95ca-fc59befe9487',
+      icon: '9be7e2c8-cc0b-4022-bc32-ffce71e6df84',
+      sortOrder: '42230e64-5b5b-4a8c-8d4d-9aaa991cf0ba',
+      isActive: '868a0bdf-a1ee-4677-a728-2675832f4b0e',
+      activeUpdateCount: 'd8d82dd2-3208-44c6-8fe6-6e411bb2ad6c',
+      lastUpdateAt: '16aeb015-78c0-4082-bca5-b5df85e96f33',
+      /** inverse of streamUpdate.stream */
+      updates: '423e451d-725b-4563-bbb7-8b7d416cf20f',
+      /** inverse of streamDocument.stream */
+      documents: '6a0a7307-bd71-45bf-b683-5a0154c442c3',
+      /** inverse of streamContact.stream */
+      contacts: '7923cde6-6833-4beb-bbed-2f35a7a2585e',
+    },
+  },
+
+  streamUpdate: {
+    object: 'a4593d7f-d813-41af-a3e1-859367389d87',
+    fields: {
+      name: '6c5d111f-a6cb-4a0a-af9b-88f88c09637b',
+      stream: 'e4884691-041b-44ce-8328-cb1890ff9089',
+      body: 'f98bc8dd-4629-45ec-9a9e-406515ccac4e',
+      updateType: 'b23c55e6-81ed-4496-aaa3-1b8478adf4ab',
+      publishedAt: '3f7d2132-0625-4b2c-b1a4-de86a72b504a',
+      sourceUrl: '1613d9cd-9cb8-4024-8e92-355de581af30',
+    },
+  },
+
+  streamDocument: {
+    object: '2a445564-258f-4bb0-8e8f-5c4e8713438f',
+    fields: {
+      name: '04c03280-c5c9-414c-9a7f-394f4b7e85ab',
+      stream: 'd98124cb-ba3d-4e7c-a658-90a9782d1e35',
+      file: '9d2b4a37-df78-44b3-a8c2-64da010d133d',
+      version: '99c76a79-325e-4016-b103-418d1ee48d3e',
+      effectiveDate: 'dbf6ca10-2201-49fb-b2a0-a46169aa5bf1',
+      documentType: '7cc540ce-1de2-41a3-be1b-d966b380dfb7',
+    },
+  },
+
+  streamContact: {
+    object: '576ee776-da32-4638-96b6-4157ad3ab40e',
+    fields: {
+      name: '07952930-357a-4979-ab92-41bc245993f3',
+      stream: 'cdabab14-1d64-40d2-a079-b31f0c00bc23',
+      person: '11b6c770-2a56-4f05-ad80-2c55485e2a62',
+      role: 'aebd86cb-af9b-4dc6-9064-196e5c01cc85',
+      notes: 'c6354b05-b652-4ebd-a13a-c6786cea307d',
+    },
+  },
+
+  // ------------------------------------------- B1 card capture + A1 score
+
+  fairLead: {
+    object: '74beaacf-e15f-4791-bd7d-7ff49573410f',
+    fields: {
+      scanId: 'b0f62ac7-5963-484a-a566-08a1f0edb5be',
+      person: 'ab4ece55-2c9f-45d6-aae4-b97ab358808e',
+      company: 'e4580096-6f98-4bd2-a23a-aa9d117f0cd7',
+      companyName: '21958a6f-ad7e-4fcf-a390-53c88c7ce5d0',
+      source: 'f8c73817-917e-48b3-8deb-7bc14065276e',
+      productInterest: 'a1b193ca-5825-4862-a2af-496527568a70',
+      notes: 'c3472d31-5596-4cc4-a93c-14639f125b70',
+      businessCardImage: 'e75b6f5c-2f09-41b6-b085-be3548ed8d59',
+      followUpStatus: 'cf4b22a8-3c4f-4290-bfe8-c9ad1404dc2d',
+      capturedAt: '5917d399-d564-4e2d-8169-6cd47ada5828',
+      score: '1242c430-35b0-4a57-b4da-a105a1e6057e',
+      scoreBreakdown: '9520b91a-3f97-48ee-9c23-2113a472bb0b',
+      scoredAt: '97ec14ed-870b-43ca-81b7-376f36679799',
     },
   },
 
@@ -299,6 +385,54 @@ export const IDS = {
       ],
       sort: 'a204a1d4-131e-4d7f-affe-a5f338a51e83',
     },
+    streamsList: {
+      view: '9dfc61d6-2ab5-4025-a0d0-e6f6b0f99e6d',
+      fields: [
+        'e6f9ef53-1947-4ec0-b839-dad5a381d2b9',
+        '5ba0cc62-f220-49e6-aa1e-6a5aefe684e5',
+        'cbabbfb6-d7d8-475e-9463-122b7913d077',
+        'b9bd650c-8269-4ed4-a181-153c090088c2',
+      ],
+      sort: '2f0b9005-2847-4339-97ea-2227ac441e4b',
+    },
+    streamOverviewFields: {
+      view: '604ef2aa-a09f-4654-8f43-3d38a33b81d9',
+      fields: [
+        '7b81ab71-5121-4691-9e02-f727bf3b30cb',
+        '07fb09b5-30b8-4013-9765-8c63ddc172c1',
+        '620514a8-40e4-4f39-b0a9-9243a35ac7cc',
+        'aa31f945-1219-4e53-87fa-0bab7583fad0',
+      ],
+    },
+    streamUpdatesWidget: {
+      view: '8eb6d0d5-4bd9-42ea-9181-1fc293d42500',
+      fields: [
+        'fd7c311c-a63b-4216-b9fa-9ff5564b9a0f',
+        '897fd0d2-b6a4-405c-9bba-dd5c03a76955',
+        '85a37b63-3310-41ea-a6d9-8c35af5d0760',
+        '15e9fe06-a7b6-4b92-84c2-7f4c8e42aa5b',
+      ],
+      sort: 'f69604c7-3db0-42f4-b33b-b15d9cdc1506',
+    },
+    streamDocumentsWidget: {
+      view: '54911e9e-1d61-42f2-8dd5-bff764eded3f',
+      fields: [
+        '9bff6be7-54a6-4447-89bc-c0fa764ebbfe',
+        '5f1f21c1-aeea-44ce-a388-0e68ded2e7c2',
+        '782c6a44-1225-4819-a689-0b630edd7713',
+        '3597442b-4a17-4555-94b4-ce465dcc585c',
+        '3801ed36-1587-4d8e-9ee5-c272aaaf6ca3',
+      ],
+      sort: 'a0546ffa-87db-4948-bd00-35c365e39fb1',
+    },
+    streamContactsWidget: {
+      view: '1d3bdd0c-c676-4ac2-961d-3452f5afaa91',
+      fields: [
+        'a33b0989-5086-4fe9-98ff-e6a7d13e83fb',
+        '1d5b96d9-951f-472d-9ae8-7df02ad0cdcc',
+        '7c28b39d-5f3b-47b2-a132-b7d40220ddc8',
+      ],
+    },
   },
 
   frontComponents: {
@@ -349,6 +483,21 @@ export const IDS = {
         triageFields: '43bc2bc2-0b80-4200-89cd-5d0d34be67ba',
       },
     },
+    productStreamRecord: {
+      layout: 'bee62304-e06e-40d2-aa01-399f4b934695',
+      tabs: {
+        overview: '5ed435e3-df65-46ae-8853-4bfefe0dc1c6',
+        updates: '2a6c4872-3410-4dba-9d2c-0c60b89f5761',
+        documents: '2caf255a-ed5f-4bc8-acb3-525f1c72c5df',
+        contacts: '7b706771-355d-4c8e-9bbf-fe9e4ca94f2a',
+      },
+      widgets: {
+        overviewFields: '290a004d-6c6c-4464-8f5e-6e2e11aa7937',
+        updates: 'a66684ab-ffe8-4be8-abf9-95bf79eeadda',
+        documents: 'c4c7ceb5-e540-4d2d-bf83-65100ab15fc2',
+        contacts: '89324e93-99f5-4b46-9923-60635538d353',
+      },
+    },
   },
 
   navigation: {
@@ -357,6 +506,7 @@ export const IDS = {
     trainingEvents: '60718293-0003-42f3-be49-5a6b7c8d9eaf',
     authorities: '60718293-0004-43f4-8f5a-6b7c8d9eafb0',
     enquiries: '0ddf4836-2b27-4fb2-9276-d1658e37714c',
+    productStreams: '6fdbe905-ea65-4ee3-af3d-7d7d6e4b72c3',
   },
 
   logicFunctions: {

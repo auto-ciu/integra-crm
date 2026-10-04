@@ -16,19 +16,25 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/lib/data.ts                  the ONLY data-API call site for the front components
 ├── src/lib/theme.ts                 --t-* token styles; brand gold pair as var() fallbacks
 ├── src/objects/{company,person,opportunity,workspace-member}/*.field.ts   standard-object extensions (defineField)
-├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule
-├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban, widgets
-├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Today (standalone)
+├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule,
+│                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead
+├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban,
+│                                    Product Streams table, widgets
+├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs), Today (standalone)
 ├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub)
-├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries
+├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams
 ├── src/logic-functions/             F0.3 spike: health-check (httpRoute), company-created (databaseEvent), daily-heartbeat (cron)
-├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub). Not app entities
+├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub), fair-lead-intake,
+│                                    score-fair-lead (A1 stub); lib/sidecar.ts shared HTTP + CRM helpers. Not app entities
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
 ├── shared/urgency.mjs               renewal maths shared by widgets and the nightly job
 ├── shared/icp.mjs                   freemail list + e-mail-domain → Company matching
+├── shared/streams.mjs               the nine product streams, one per PRODUCT_CATEGORY (seed + verify read this)
+├── shared/scoring.mjs               fair-lead score rules (A1 stub; score-fair-lead + verify read this)
 ├── ops/lib/twenty-api.{mjs,ts}      REST/metadata client (ops scripts; .ts port for the sidecar)
 ├── ops/nightly-status.mjs           urgency/status recompute via REST (idempotent, --dry-run)
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
+├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
 ├── docs/logic-function-spike.md     F0.3 findings: what logic functions can do on 2.41, and the decision
 └── verify-model.mjs                 dependency-free static check (npm run verify)
 ```
@@ -55,15 +61,16 @@ npm run deploy                    # twenty apply: apply them
 
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run stages:dry   # then stages:sync
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run nightly:dry  # then nightly (cron)
+TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run streams:dry  # then streams:seed
 ```
 
 ## Model
 
 | Object | Kind | Fields added |
 | --- | --- | --- |
-| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents, enquiries inverses) |
-| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus (+ enquiries inverse) |
-| Opportunity | extend | productLine, tier (+ enquiries inverse); stage set replaced by `ops/sync-opportunity-stages.mjs` |
+| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents, enquiries, fairLeads inverses) |
+| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus (+ enquiries, fairLeads, streamContacts inverses) |
+| Opportunity | extend | productLine, tier, leadSource (fair name, text) (+ enquiries inverse); stage set replaced by `ops/sync-opportunity-stages.mjs` |
 | WorkspaceMember | extend | enquiryRoutingRules inverse (unverified on a live server, see below) |
 | AR Mandate | new | company→, status, startDate, endDate, renewalDate, docusignEnvelopeId, annualFee (EUR), signatory, urgency (computed), documents (files), products |
 | Mandate Product | new | arMandate→, productName, category, dppStatus |
@@ -72,6 +79,11 @@ TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run nightly:dry  # t
 | Enquiry | new | reference (unique, label), intakeId (unique), status, priority, category, subject, language, source, sourcePage, utmSource/Medium/Campaign, spamCheck, triageNotes, closedAt, relatedCompany→, relatedPerson→, relatedOpportunity→, messages |
 | Enquiry Message | new | name, enquiry→, direction, body, senderEmail, sentAt, isAutoReply |
 | Enquiry Routing Rule | new | name, category, language, assignTo→WorkspaceMember, isActive, priority |
+| Product Stream | new | name, slug (unique), description, icon, sortOrder, isActive, activeUpdateCount + lastUpdateAt (denormalised, not yet computed), updates, documents, contacts |
+| Stream Update | new | title (`name`), stream→, body, updateType, publishedAt, sourceUrl |
+| Stream Document | new | title (`name`), stream→, file, version, effectiveDate, documentType |
+| Stream Contact | new | name, stream→, person→, role, notes |
+| Fair Lead | new | scanId (unique, label), person→, company→, companyName, source, productInterest (multi), notes, businessCardImage, followUpStatus, capturedAt, score, scoreBreakdown, scoredAt |
 
 Urgency windows (days to `renewalDate`): **None** > 180 · **Watch** 90–180 ·
 **Due** < 90 · **Overdue** < 0. `Active` flips to `Expiring` inside 90 days.
@@ -106,8 +118,8 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
   navigation shapes, `defineFrontComponent` (from `twenty-sdk/define`) and
   `useRecordId` (from `twenty-sdk/front-component`).
 - `npm run build` (`twenty dev:build`) succeeds with no warnings and the
-  manifest holds every entity: 7 objects, 20 standard-object fields, 11 views,
-  3 front components, 3 page layouts, 5 navigation items, 3 logic functions,
+  manifest holds every entity: 12 objects, 24 standard-object fields, 16 views,
+  3 front components, 4 page layouts, 6 navigation items, 3 logic functions,
   1 role.
 - `src/standard-ids.ts` matches the SDK's `STANDARD_OBJECT` constants.
 
@@ -133,7 +145,14 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
    - The Enquiries table's `createdAt` column uses the SDK's derived
      system-field id (`views/columns.ts → systemFieldId`).
    - `reference` and `intakeId` rely on `isUnique` on TEXT fields.
-5. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
+5. B1 / A1 (fair capture and streams):
+   - The Product Stream record page's three tables (`RECORD_TABLE`) have the
+     same scoping question as item 3.
+   - `fair-lead-intake` writes a partial `phones` composite
+     (`{ primaryPhoneNumber }`); whether REST accepts it without a country
+     code is unconfirmed.
+   - `StreamUpdate.updateType` is not called `type`, which Twenty reserves.
+6. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
    `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
    also need cron registration on the worker. See
    `docs/logic-function-spike.md`.
