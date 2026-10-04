@@ -19,22 +19,24 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule,
 │                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead,
 │                                    PricingStrategy, PriceItem, ReplyTemplate, LeadDiscoveryRun, DiscoveredCompany,
-│                                    TrainingRegistration
+│                                    TrainingRegistration, CustomerEvent (C3), ResearchBrief (D1-D2)
 ├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban,
 │                                    Product Streams table, Pricing Strategies + Price Items tables, Reply Templates table,
 │                                    Lead Discovery + Discovered Companies tables, Training Registrations table, widgets
 ├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs),
-│                                    Pricing Strategy record page (2 tabs), Training Event record page (2 tabs), Today (standalone)
+│                                    Pricing Strategy record page (2 tabs), Training Event record page (2 tabs),
+│                                    Research Brief record page (Overview / Raw Result), Today (standalone)
 ├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub), PricingDisplay (stub),
 │                                    RegisterForTrainingButton (stub)
 ├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams, Pricing,
-│                                    Lead Discovery
+│                                    Lead Discovery, Portal Events, Market Research
 ├── src/logic-functions/             F0.3 spike: health-check (httpRoute), company-created (databaseEvent), daily-heartbeat (cron)
 ├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub), fair-lead-intake,
 │                                    score-fair-lead (A1 stub), send-auto-reply (E2), generate-stream-digest (B2),
 │                                    renewals-check, send-renewal-notifications (stub), run-linkedin-discovery, apify-webhook,
-│                                    score-discovered-company, promote-discovered-company (A2), register-for-training (X5);
-│                                    lib/sidecar.ts shared HTTP + CRM helpers, lib/discovery.ts Apify client. Not app entities
+│                                    score-discovered-company, promote-discovered-company (A2), register-for-training (X5),
+│                                    sync-pricing-to-stripe + stripe-webhook (C2), sync-portal-event (C3), run-research (D1-D2, BLOCKED);
+│                                    lib/sidecar.ts shared HTTP + CRM helpers, lib/discovery.ts Apify client, lib/stripe.ts Stripe client. Not app entities
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
 ├── shared/urgency.mjs               renewal maths shared by widgets and renewals-check (planMandate)
 ├── shared/reply-templates.mjs       E2: the ten seed templates, template choice (fallback order) and rendering
@@ -44,6 +46,9 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── shared/scoring.mjs               fair-lead score rules (A1 stub; score-fair-lead + verify read this)
 ├── shared/pricing.mjs               C1 pricing: option sets, D3 display rules, canonical strategies, pricing.json transform
 ├── shared/lead-discovery.mjs        A2: Apify actor pin, cost estimate + caps, guardrails, item mapping, discovery score rules
+├── shared/stripe-sync.mjs           C2: CRM pricing → Stripe product/price mapping, sync plan, webhook signature check
+├── shared/portal-events.mjs         C3: customer event types/sources, which events open a pipeline Opportunity
+├── shared/research-prompts.mjs      D1-D2: one prompt per product category, depth/status options, prompt builder
 ├── shared/training.mjs              X5: the three seed training events, event-passed + registration rules
 ├── ops/lib/twenty-api.{mjs,ts}      REST/metadata client (ops scripts; .ts port for the sidecar)
 ├── ops/lib/sidecar.mjs              client for the ops-invoked sidecar functions (SIDECAR_URL, OPS_TOKEN)
@@ -88,6 +93,8 @@ TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:publish 
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run replies:dry  # then replies:seed
 TWENTY_API_URL=… TWENTY_API_KEY=… SIDECAR_URL=… OPS_TOKEN=… npm run digests:dry  # then digests (weekly cron)
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run training:dry  # then training:seed
+TWENTY_API_URL=… TWENTY_API_KEY=… STRIPE_SECRET_KEY=sk_test_… npm run stripe:dry   # preview; then SIDECAR_URL=… OPS_TOKEN=… npm run stripe:sync
+TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run research:dry  # then research:seed
 npm run discover:dry -- --config=leads.json                                # cost + query preview, no network
 SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --config=leads.json --wait
 ```
@@ -259,7 +266,31 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      logic-function route is the better home once logic functions run.
    - The `trainingEvent` / `people` / `trainingRegistrations` queries in
      `src/lib/data.ts` have the same generated-client caveat as item 1.
-9. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
+9. Wave 3 (C2 / C3 / D1-D2):
+   - `sync-pricing-to-stripe` and `stripe-webhook` use Stripe's REST API with
+     plain `fetch` (no `stripe` package) and have not run against Stripe: the
+     calls follow Stripe's API docs and were exercised against an in-memory
+     fake only. Run `npm run stripe:sync` with a `sk_test_` key first. Products
+     are keyed by `id = strategy.correlationId`, prices by `lookup_key =
+     item.correlationId`; a changed fee makes a new price that takes the
+     lookup key and archives the old one (Stripe cannot edit an amount).
+     Nothing is deleted. HIDE and out-of-window strategies get an inactive
+     product and no prices; their items count as skipped.
+   - `stripe-webhook` needs its own API Gateway route, with no bearer: Stripe's
+     signature is the authentication (`STRIPE_WEBHOOK_SECRET`). It only logs
+     `price.created` / `price.updated` / `checkout.session.completed`.
+   - `sync-portal-event` authenticates with its own `PORTAL_TOKEN` (the portal
+     holds it), not `OPS_TOKEN`. A PURCHASE / RENEWAL finds the customer's open
+     Opportunity (by Company, else Person, else name) and moves it to
+     Subscribed, or creates one; a LOST opportunity is not reopened. A customer
+     that matches no Person or Company still gets an Opportunity, named after
+     them and linked to nobody. The portal-side caller is not written.
+   - `run-research` is BLOCKED: without `ANTHROPIC_API_KEY`
+     (`/integra/anthropic-api-key` in AWS Parameter Store, not yet created) it
+     answers `{ status: "BLOCKED", reason: "ANTHROPIC_API_KEY not configured" }`
+     and writes nothing. The call to Claude behind that guard (B2's $10 cap,
+     no web search, `resultJson` / `sourceUrls` left empty) has never run.
+10. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
    `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
    also need cron registration on the worker. See
    `docs/logic-function-spike.md`.

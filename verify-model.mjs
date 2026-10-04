@@ -46,6 +46,13 @@
  *      to off, and the score rules give the expected scores.
  *  16. X5 training: the three seed events use real option values, a past
  *      event is closed, and the registration statuses are as specified.
+ *  17. C2 Stripe sync: the pricing seed maps to Stripe products and prices
+ *      (EUR cents, on-request and HIDE skipped, metadata), the plan is
+ *      idempotent, and the webhook signature check accepts only a valid one.
+ *  18. C3 portal sync: the event types and sources are as specified, only a
+ *      purchase or renewal touches the pipeline, and on the Subscribed stage.
+ *  19. D1-D2 research: one prompt per researchable product category, the
+ *      prompt builder, and the BLOCKED answer while there is no API key.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -68,6 +75,7 @@ const EXPECTED_OBJECTS = [
   'ReplyTemplate',
   'LeadDiscoveryRun', 'DiscoveredCompany',
   'TrainingRegistration',
+  'CustomerEvent', 'ResearchBrief',
 ];
 
 const failures = [];
@@ -709,6 +717,148 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`X5 training: ${problems.join('; ')}`);
   else ok(`X5 training: ${t.TRAINING_EVENTS.length} seed events (${names.join(' / ')}); ${passed.length} event-passed cases; statuses ${statuses.join('/')}`);
+}
+
+// ------------------------------------------------------------ 17. C2 Stripe sync
+{
+  const problems = [];
+  const s = await import(pathToFileURL(join(ROOT, 'shared/stripe-sync.mjs')).href);
+  const p = await import(pathToFileURL(join(ROOT, 'shared/pricing.mjs')).href);
+  const today = '2026-06-01';
+
+  // The seed as the CRM would return it: strategies with ids, items pointing at them.
+  const strategies = p.PRICING_STRATEGIES.map(({ items, ...st }, i) => ({ ...st, id: `strategy-${i}` }));
+  const items = p.PRICING_STRATEGIES.flatMap((st, i) => st.items.map((it) => ({ ...it, strategyId: `strategy-${i}` })));
+  const plan = s.planSync(strategies, items, {}, today);
+  if (plan.products.length !== 3 || plan.products.some((x) => !x.active)) problems.push('want three active products from the seed');
+  if (plan.prices.length !== 9 || plan.skipped.length !== 3) problems.push(`seed → ${plan.prices.length} prices, ${plan.skipped.length} skipped; want 9 and 3 (the Boss rows)`);
+  if (plan.skipped.some((x) => x.reason !== 'on_request')) problems.push('skipped rows must all be on_request');
+  const beginner = plan.prices.find((x) => x.lookupKey === 'dpp-beginner-2026');
+  if (!beginner || beginner.unitAmount !== 95000 || beginner.currency !== 'eur' || beginner.interval !== 'year' || beginner.productId !== 'dsp-2026') {
+    problems.push(`dpp-beginner-2026 → ${JSON.stringify(beginner)}; want 95000 eur/year on product dsp-2026`);
+  }
+  if (beginner?.metadata.tier !== 'BEGINNER' || beginner?.metadata.displayMode !== 'SHOW_PER_OPTION' || 'highlighted' in (beginner?.metadata ?? {})) {
+    problems.push('price metadata: tier and D3 displayMode set, highlighted only when highlighted');
+  }
+  if (s.toCents(19.99) !== 1999 || s.toCents(1020) !== 102000) problems.push('toCents rounds to whole cents');
+
+  // Highlighted, on-request, hidden and inactive.
+  const highlighted = items.map((it) => (it.correlationId === 'ar-boost-2026' ? { ...it, isHighlighted: true } : it));
+  if (s.planSync(strategies, highlighted, {}, today).prices.find((x) => x.lookupKey === 'ar-boost-2026')?.metadata.highlighted !== 'true') problems.push('isHighlighted → metadata.highlighted "true"');
+  const hidden = strategies.map((st) => (st.id === 'strategy-1' ? { ...st, displayMode: 'HIDE' } : st));
+  const hiddenPlan = s.planSync(hidden, items, {}, today);
+  if (hiddenPlan.products.find((x) => x.id === 'ar-2026')?.active !== false) problems.push('HIDE strategy → product active false');
+  if (hiddenPlan.prices.some((x) => x.productId === 'ar-2026') || hiddenPlan.skipped.filter((x) => x.reason === 'strategy_hidden').length !== 4) problems.push('HIDE strategy → none of its items gets a price');
+  const expired = strategies.map((st) => (st.id === 'strategy-2' ? { ...st, isActive: false } : st));
+  if (s.planSync(expired, items, {}, today).products.length !== 2) problems.push('no filter syncs live strategies only');
+  if (s.planSync(expired, items, { strategyId: 'strategy-2' }, today).products[0]?.active !== false) problems.push('an inactive strategy asked for by id → inactive product');
+
+  // Filters.
+  const one = s.planSync(strategies, items, { correlationIds: ['ar-builder-2026'] }, today);
+  if (one.products.length !== 1 || one.prices.length !== 1 || one.prices[0].lookupKey !== 'ar-builder-2026') problems.push('an item correlationId syncs that item only');
+  const whole = s.planSync(strategies, items, { correlationIds: ['ar-2026'] }, today);
+  if (whole.products.length !== 1 || whole.prices.length !== 3) problems.push('a strategy correlationId syncs the strategy and its priced items');
+  if (s.planSync(strategies, items, { strategyId: 'strategy-0' }, today).products[0].id !== 'dsp-2026') problems.push('strategyId filter');
+
+  // Idempotency: the same input plans the same state, and a matching Stripe needs no write.
+  if (JSON.stringify(s.planSync(strategies, items, {}, today)) !== JSON.stringify(plan)) problems.push('planSync is not deterministic');
+  if (Object.keys(s.metadataPatch(beginner.metadata, { ...beginner.metadata }, s.PRICE_METADATA_KEYS)).length) problems.push('metadataPatch of identical metadata must be empty');
+  const unset = s.metadataPatch({ correlationId: 'x' }, { correlationId: 'x', highlighted: 'true', other: 'kept' }, s.PRICE_METADATA_KEYS);
+  if (JSON.stringify(unset) !== '{"highlighted":""}') problems.push(`metadataPatch should unset only a managed key that stopped applying, got ${JSON.stringify(unset)}`);
+
+  // Mode from the key.
+  for (const [key, want] of [['sk_test_abc123', 'test'], ['sk_live_abc123', 'live'], ['rk_live_abc123', 'live'], ['pk_test_abc', null], ['whsec_abc', null], ['', null], [undefined, null]]) {
+    if (s.stripeMode(key) !== want) problems.push(`stripeMode(${key}) !== ${want}`);
+  }
+
+  // Webhook signature.
+  const body = '{"id":"evt_1","type":"price.updated"}';
+  const secret = 'whsec_test';
+  const now = new Date('2026-06-01T12:00:00Z');
+  const ts = Math.floor(now.getTime() / 1000);
+  const header = s.signStripePayload(body, secret, ts);
+  const sig = (b, h, sec = secret, at = now) => s.verifyStripeSignature(b, h, sec, at);
+  if (!sig(body, header)) problems.push('a correctly signed payload must verify');
+  if (sig(body + ' ', header)) problems.push('a changed body must not verify');
+  if (sig(body, header, 'whsec_other')) problems.push('the wrong secret must not verify');
+  if (sig(body, header, secret, new Date(now.getTime() + 6 * 60_000))) problems.push('a signature older than the tolerance must not verify');
+  if (sig(body, undefined) || sig(body, 't=1,v1=') || sig(body, `t=${ts}`) || sig(body, `t=${ts},v1=zz`)) problems.push('a missing or malformed header must not verify');
+  if (!sig(body, `t=${ts},v1=${'0'.repeat(64)},${header.split(',')[1]}`)) problems.push('any matching v1 among several verifies');
+
+  // The sidecar never carries a key.
+  for (const f of ['src/functions/sync-pricing-to-stripe.ts', 'src/functions/stripe-webhook.ts', 'src/functions/lib/stripe.ts', 'ops/sync-to-stripe.mjs', 'shared/stripe-sync.mjs']) {
+    if (/\b(?:sk|rk)_(?:test|live)_[A-Za-z0-9]{6,}|whsec_[A-Za-z0-9]{6,}/.test(read(f))) problems.push(`${f}: contains what looks like a Stripe secret`);
+  }
+
+  if (problems.length) fail(`C2 Stripe sync: ${problems.join('; ')}`);
+  else ok(`C2 Stripe sync: seed → ${plan.products.length} products, ${plan.prices.length} prices (EUR cents, yearly), ${plan.skipped.length} on request skipped; HIDE/inactive/highlight/filter cases; idempotent plan + metadata patch; webhook signature accepts only a valid, fresh one`);
+}
+
+// ----------------------------------------------------------- 18. C3 portal sync
+{
+  const problems = [];
+  const e = await import(pathToFileURL(join(ROOT, 'shared/portal-events.mjs')).href);
+  const { OPPORTUNITY_STAGES } = await import(pathToFileURL(join(ROOT, 'shared/stages.mjs')).href);
+  const types = e.CUSTOMER_EVENT_TYPES.map((t) => t.value);
+  const sources = e.CUSTOMER_EVENT_SOURCES.map((t) => t.value);
+  if (JSON.stringify(types) !== JSON.stringify(['PURCHASE', 'RENEWAL', 'CANCELLATION', 'UPGRADE', 'DOWNGRADE', 'SUPPORT', 'LOGIN'])) problems.push(`event types are [${types.join(', ')}]`);
+  if (JSON.stringify(sources) !== JSON.stringify(['STRIPE', 'PORTAL', 'MANUAL'])) problems.push(`sources are [${sources.join(', ')}]`);
+  const touching = types.filter((t) => e.touchesOpportunity(t));
+  if (JSON.stringify(touching) !== JSON.stringify(['PURCHASE', 'RENEWAL'])) problems.push(`opportunity-touching events are [${touching.join(', ')}], want PURCHASE and RENEWAL`);
+  const stages = OPPORTUNITY_STAGES.map((s) => s.value);
+  if (!stages.includes(e.OPPORTUNITY_STAGE_ON_PAYMENT) || e.OPPORTUNITY_STAGE_ON_PAYMENT !== 'SUBSCRIBED') problems.push('a payment must land on the SUBSCRIBED stage');
+  if (e.CLOSED_OPPORTUNITY_STAGES.some((x) => !stages.includes(x))) problems.push('CLOSED_OPPORTUNITY_STAGES has a value that is not a stage');
+  if (e.CLOSED_OPPORTUNITY_STAGES.includes(e.OPPORTUNITY_STAGE_ON_PAYMENT)) problems.push('the payment stage cannot be a closed stage');
+  for (const [v, want] of [['li.wei@acme-battery.cn', true], [' a@b.co ', true], ['Acme Battery Co.', false], ['a@b', false], ['', false], [undefined, false]]) {
+    if (e.isEmail(v) !== want) problems.push(`isEmail(${JSON.stringify(v)}) !== ${want}`);
+  }
+  if (e.eventName('PURCHASE', ' Acme ') !== 'PURCHASE — Acme') problems.push('eventName');
+
+  if (problems.length) fail(`C3 portal sync: ${problems.join('; ')}`);
+  else ok(`C3 portal sync: ${types.length} event types, ${sources.length} sources; ${touching.join('/')} → ${e.OPPORTUNITY_STAGE_ON_PAYMENT}, ${e.CLOSED_OPPORTUNITY_STAGES.join('/')} never reopened`);
+}
+
+// ---------------------------------------------------------- 19. D1-D2 research
+{
+  const problems = [];
+  const r = await import(pathToFileURL(join(ROOT, 'shared/research-prompts.mjs')).href);
+  const { PRODUCT_STREAMS } = await import(pathToFileURL(join(ROOT, 'shared/streams.mjs')).href);
+  const optionsSource = read('src/options.ts');
+  const optionValues = (name) => {
+    const block = new RegExp(`export const ${name} = options\\(\\[([\\s\\S]*?)\\]\\);`).exec(optionsSource)?.[1] ?? '';
+    return [...block.matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  };
+  const categories = optionValues('PRODUCT_CATEGORY');
+  const streamCategories = PRODUCT_STREAMS.map((s) => s.category);
+
+  const want = ['BATTERY_LI_ION', 'BATTERY_LMT', 'TEXTILES', 'ELECTRONICS', 'FURNITURE', 'TOYS', 'MACHINERY', 'MEDICAL_DEVICES'];
+  if (JSON.stringify(r.RESEARCH_TOPICS) !== JSON.stringify(want)) problems.push(`prompt topics are [${r.RESEARCH_TOPICS.join(', ')}]`);
+  for (const t of r.RESEARCH_TOPICS) {
+    if (!categories.includes(t) || !streamCategories.includes(t)) problems.push(`${t} is not a PRODUCT_CATEGORY with a stream`);
+    if (r.RESEARCH_PROMPTS[t].trim().length < 60) problems.push(`${t}: prompt is empty or too short`);
+  }
+  const unresearched = streamCategories.filter((c) => !r.RESEARCH_TOPICS.includes(c));
+  if (JSON.stringify(unresearched) !== '["OTHER"]') problems.push(`categories without a prompt: [${unresearched.join(', ')}], want only OTHER`);
+  if (!r.RESEARCH_PROMPTS.MACHINERY.includes('2023/1230') || !r.RESEARCH_PROMPTS.BATTERY_LMT.includes('EN 50604-1')) problems.push('prompt text lost its regulation references');
+
+  const depths = r.RESEARCH_DEPTHS.map((d) => d.value);
+  const statuses = r.RESEARCH_STATUSES.map((d) => d.value);
+  if (JSON.stringify(depths) !== '["OVERVIEW","DEEP_DIVE","COMPLIANCE_CHECK"]') problems.push(`depths are [${depths.join(', ')}]`);
+  if (JSON.stringify(statuses) !== '["DRAFT","SUBMITTED","IN_PROGRESS","COMPLETED","FAILED"]') problems.push(`statuses are [${statuses.join(', ')}]`);
+  if (JSON.stringify(Object.keys(r.DEPTH_INSTRUCTIONS)) !== JSON.stringify(depths)) problems.push('every depth needs an instruction');
+
+  const built = r.researchPrompt({ topic: 'TOYS', scope: 'China', depth: 'DEEP_DIVE' });
+  if (!built?.startsWith(r.RESEARCH_PROMPTS.TOYS) || !built.includes('Scope: China.') || !built.includes('deep dive')) problems.push('researchPrompt = topic prompt + scope + depth');
+  if (r.researchPrompt({ topic: 'OTHER' }) !== null || r.researchPrompt({ topic: 'TOYS', depth: 'NOPE' }) !== null) problems.push('no prompt for OTHER or an unknown depth');
+  if (!r.researchPrompt({ topic: 'TOYS' }).includes(`Scope: ${r.DEFAULT_RESEARCH_SCOPE}.`)) problems.push('default scope');
+
+  // The skeleton is blocked without a key, and spends under the same cap as the digests.
+  const fn = read('src/functions/run-research.ts');
+  if (!fn.includes("'ANTHROPIC_API_KEY not configured'") || !fn.includes("status: 'BLOCKED'")) problems.push('run-research must answer BLOCKED / "ANTHROPIC_API_KEY not configured" without a key');
+  if (!/maxInputTokens\(/.test(fn) || !/DIGEST_MAX_OUTPUT_TOKENS/.test(fn)) problems.push('run-research must apply the B2 digest cost cap');
+
+  if (problems.length) fail(`D1-D2 research: ${problems.join('; ')}`);
+  else ok(`D1-D2 research: ${r.RESEARCH_TOPICS.length} prompts on PRODUCT_CATEGORY topics (OTHER has none); ${depths.length} depths, ${statuses.length} statuses; prompt builder; run-research BLOCKED without a key, B2 cost cap`);
 }
 
 // ----------------------------------------------------------------- report

@@ -9,6 +9,8 @@
 import { options, type TagColor } from './lib/fields';
 import { OPPORTUNITY_STAGES } from '../shared/stages.mjs';
 import { CURRENCIES, DISPLAY_MODES, PRICE_PRODUCT_LINES, STRATEGY_TYPES } from '../shared/pricing.mjs';
+import { CUSTOMER_EVENT_SOURCES, CUSTOMER_EVENT_TYPES } from '../shared/portal-events.mjs';
+import { RESEARCH_DEPTHS, RESEARCH_STATUSES } from '../shared/research-prompts.mjs';
 
 export const PROVINCE = options([
   ['GUANGDONG', 'Guangdong · 广东', 'blue'],
@@ -279,3 +281,13 @@ export const TRAINING_REGISTRATION_STATUS = options([
   ['CANCELLED', 'Cancelled · 已取消', 'gray'],
   ['NO_SHOW', 'No-show · 未出席', 'red'],
 ]);
+
+// ------------------------------------------------------- C3 portal sync
+
+export const CUSTOMER_EVENT_TYPE = fromShared(CUSTOMER_EVENT_TYPES);
+export const CUSTOMER_EVENT_SOURCE = fromShared(CUSTOMER_EVENT_SOURCES);
+
+// ------------------------------------------------ D1-D2 AI market research
+
+export const RESEARCH_DEPTH = fromShared(RESEARCH_DEPTHS);
+export const RESEARCH_STATUS = fromShared(RESEARCH_STATUSES);

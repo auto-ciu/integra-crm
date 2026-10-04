@@ -27,7 +27,11 @@
     "discover": "node ops/discover-leads.mjs",
     "discover:dry": "node ops/discover-leads.mjs --dry-run",
     "training:seed": "node ops/seed-training-events.mjs",
-    "training:dry": "node ops/seed-training-events.mjs --dry-run"
+    "training:dry": "node ops/seed-training-events.mjs --dry-run",
+    "stripe:sync": "node ops/sync-to-stripe.mjs",
+    "stripe:dry": "node ops/sync-to-stripe.mjs --dry-run",
+    "research:seed": "node ops/seed-research-briefs.mjs",
+    "research:dry": "node ops/seed-research-briefs.mjs --dry-run"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
