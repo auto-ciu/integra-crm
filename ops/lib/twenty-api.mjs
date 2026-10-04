@@ -5,7 +5,7 @@
  *   TWENTY_API_URL   base URL of the Twenty server (default http://localhost:3000)
  *   TWENTY_API_KEY   an API key created in Settings → API & Webhooks (required)
  *
- * REST record endpoints: GET/PATCH /rest/<namePlural>[/<id>]
+ * REST record endpoints: GET/POST/PATCH /rest/<namePlural>[/<id>]
  * Metadata GraphQL:      POST /metadata
  */
 
@@ -75,6 +75,19 @@ export async function findAllRecords(config, namePlural, { filter, orderBy, page
     startingAfter = page.pageInfo.endCursor;
   }
   return records;
+}
+
+/**
+ * POST /rest/<namePlural>. Twenty answers `{ data: { create<NameSingular>: record } }`;
+ * the single value under `data` is returned whatever its key.
+ */
+export async function createRecord(config, namePlural, data) {
+  const result = await request(config, 'POST', `/rest/${namePlural}`, data);
+  const record = result?.data ? Object.values(result.data)[0] : undefined;
+  if (!record?.id) {
+    throw new TwentyApiError(`POST /rest/${namePlural}: response carried no record`, { body: result });
+  }
+  return record;
 }
 
 export async function updateRecord(config, namePlural, id, patch) {

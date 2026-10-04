@@ -24,6 +24,10 @@
  *      silently skipped).
  *  10. E1: the Enquiries inbox kanban is built from ENQUIRY_STATUS, and
  *      shared/icp.mjs never matches a Company by a freemail domain.
+ *  11. B1/A1: shared/streams.mjs has one stream per PRODUCT_CATEGORY value
+ *      (unique slugs), the fair-lead intake and score weights cover the same
+ *      values, the score rules give the expected scores, and no custom object
+ *      redeclares a Twenty system field (createdAt, …).
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -41,6 +45,7 @@ const ALLOWED_HEX = new Set(['#c5a059', '#775a19']);
 const EXPECTED_OBJECTS = [
   'ArMandate', 'MandateProduct', 'TrainingEvent', 'Authority',
   'Enquiry', 'EnquiryMessage', 'EnquiryRoutingRule',
+  'ProductStream', 'StreamUpdate', 'StreamDocument', 'StreamContact', 'FairLead',
 ];
 
 const failures = [];
@@ -263,6 +268,54 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
   }
   if (wrong.length) fail(`shared/icp.mjs: ${wrong.join('; ')}`);
   else ok(`Enquiry inbox kanban grouped by status from ENQUIRY_STATUS; freemail domains (${icp.FREEMAIL_DOMAINS.length}) never match a Company`);
+}
+
+// ------------------------------------- 11. B1 streams + A1 fair-lead scoring
+{
+  const problems = [];
+  const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+  const optionsSource = read('src/options.ts');
+  const categoryBlock = /export const PRODUCT_CATEGORY = options\(\[([\s\S]*?)\]\);/.exec(optionsSource)?.[1] ?? '';
+  const categories = [...categoryBlock.matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  if (categories.length === 0) problems.push('could not read PRODUCT_CATEGORY from src/options.ts');
+
+  const { PRODUCT_STREAMS } = await import(pathToFileURL(join(ROOT, 'shared/streams.mjs')).href);
+  if (!same(PRODUCT_STREAMS.map((s) => s.category), categories)) {
+    problems.push(`shared/streams.mjs categories [${PRODUCT_STREAMS.map((s) => s.category).join(', ')}] ≠ PRODUCT_CATEGORY [${categories.join(', ')}]`);
+  }
+  const slugs = PRODUCT_STREAMS.map((s) => s.slug);
+  if (new Set(slugs).size !== slugs.length) problems.push('shared/streams.mjs: duplicate slugs');
+  if (slugs.some((s) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s))) problems.push('shared/streams.mjs: slugs must be kebab-case');
+  if (PRODUCT_STREAMS.some((s, i) => s.sortOrder !== i)) problems.push('shared/streams.mjs: sortOrder is not 0..n-1 in order');
+
+  const intake = read('src/functions/fair-lead-intake.ts');
+  const intakeBlock = /const ProductCategory = z\.enum\(\[([\s\S]*?)\]\)/.exec(intake)?.[1] ?? '';
+  const intakeValues = [...intakeBlock.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]);
+  if (!same(intakeValues, categories)) problems.push(`fair-lead-intake.ts ProductCategory [${intakeValues.join(', ')}] ≠ PRODUCT_CATEGORY`);
+
+  const scoring = await import(pathToFileURL(join(ROOT, 'shared/scoring.mjs')).href);
+  if (!same(Object.keys(scoring.PRODUCT_INTEREST_POINTS), categories)) problems.push('shared/scoring.mjs PRODUCT_INTEREST_POINTS keys ≠ PRODUCT_CATEGORY');
+  const cases = [
+    [{ productInterest: ['TEXTILES', 'BATTERY_LI_ION'], email: 'wei@acme-battery.cn', phone: '+86 138', companyName: 'Acme' }, 65],
+    [{ productInterest: ['MEDICAL_DEVICES'], email: 'a@qq.com', companyId: 'c1' }, 40],
+    [{ productInterest: ['BATTERY_LMT'], email: 'a@gmail.com', phone: '  ' }, 20],
+    [{ productInterest: [], email: 'not-an-email' }, 0],
+  ];
+  for (const [lead, want] of cases) {
+    const { score } = scoring.scoreFairLead(lead);
+    if (score !== want) problems.push(`scoreFairLead(${JSON.stringify(lead)}) = ${score}, want ${want}`);
+  }
+
+  const SYSTEM_FIELDS = ['id', 'createdAt', 'updatedAt', 'deletedAt', 'createdBy', 'updatedBy', 'position', 'searchVector'];
+  for (const [file, text] of Object.entries(sources).filter(([f]) => f.endsWith('.object.ts'))) {
+    for (const m of text.matchAll(/\bname:\s*'([^']+)'/g)) {
+      if (SYSTEM_FIELDS.includes(m[1])) problems.push(`${rel(file)} declares system field "${m[1]}"`);
+    }
+  }
+
+  if (problems.length) fail(`B1/A1: ${problems.join('; ')}`);
+  else ok(`${PRODUCT_STREAMS.length} product streams = PRODUCT_CATEGORY; intake + score weights cover them; ${cases.length} fair-lead score cases; no system-field redeclared`);
 }
 
 // ----------------------------------------------------------------- report

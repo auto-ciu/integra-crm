@@ -14,7 +14,9 @@
     "nightly": "node ops/nightly-status.mjs",
     "nightly:dry": "node ops/nightly-status.mjs --dry-run",
     "stages:sync": "node ops/sync-opportunity-stages.mjs",
-    "stages:dry": "node ops/sync-opportunity-stages.mjs --dry-run"
+    "stages:dry": "node ops/sync-opportunity-stages.mjs --dry-run",
+    "streams:seed": "node ops/seed-product-streams.mjs",
+    "streams:dry": "node ops/seed-product-streams.mjs --dry-run"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

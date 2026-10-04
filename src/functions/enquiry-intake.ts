@@ -20,7 +20,6 @@
  * people / enquiries / enquiryMessages), INTAKE_TOKEN (shared bearer secret
  * with the Pages Function).
  */
-import { randomInt, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
 import {
@@ -33,7 +32,7 @@ import {
   type TwentyConfig,
   type TwentyRecord,
 } from '../../ops/lib/twenty-api';
-import { companyDomainForEmail, hostMatchesDomain } from '../../shared/icp.mjs';
+import { json, matchCompany, randomToken, readAuthorisedJson, splitName, type HttpEvent, type HttpResult } from './lib/sidecar';
 
 // ------------------------------------------------------------------ payload
 
@@ -72,13 +71,10 @@ export type IntakeResult = {
 
 // ------------------------------------------------------------------- intake
 
-const REFERENCE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I/L
-
 /** ENQ-YYMMDD-XXXX (UTC date). 31^4 ≈ 920k per day; `reference` is unique-indexed. */
 export function newReference(now = new Date()): string {
   const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, '');
-  const suffix = Array.from({ length: 4 }, () => REFERENCE_ALPHABET[randomInt(REFERENCE_ALPHABET.length)]).join('');
-  return `ENQ-${yymmdd}-${suffix}`;
+  return `ENQ-${yymmdd}-${randomToken(4)}`;
 }
 
 const INTEREST_LABEL: Record<EnquiryPayload['interest'], string> = {
@@ -87,11 +83,6 @@ const INTEREST_LABEL: Record<EnquiryPayload['interest'], string> = {
   TRAINING: 'Training',
   AUTHORITIES: 'For Authorities',
   OTHER: 'General',
-};
-
-const splitName = (name: string) => {
-  const [firstName, ...rest] = name.split(/\s+/);
-  return { firstName, lastName: rest.join(' ') };
 };
 
 async function upsertPerson(config: TwentyConfig, p: EnquiryPayload, companyId: string | null): Promise<TwentyRecord> {
@@ -117,22 +108,6 @@ async function upsertPerson(config: TwentyConfig, p: EnquiryPayload, companyId: 
     ...(p.wechatId ? { wechatId: p.wechatId } : {}),
     ...(companyId ? { companyId } : {}),
   });
-}
-
-/** Company whose website host is the sender's domain (or a subdomain of it). */
-async function matchCompany(config: TwentyConfig, email: string): Promise<TwentyRecord | null> {
-  const domain = companyDomainForEmail(email);
-  if (!domain) return null;
-  const candidates = await findRecords(config, 'companies', {
-    filter: `domainName.primaryLinkUrl[ilike]:${JSON.stringify(`%${domain}%`)}`,
-    limit: 10,
-  });
-  return (
-    candidates.find((c) => {
-      const links = c.domainName as { primaryLinkUrl?: string } | null | undefined;
-      return hostMatchesDomain(links?.primaryLinkUrl ?? '', domain);
-    }) ?? null
-  );
 }
 
 /** Create the Enquiry; if that fails because the intakeId now exists, return the existing one. */
@@ -219,50 +194,10 @@ export async function intakeEnquiry(config: TwentyConfig, p: EnquiryPayload, now
 
 // ------------------------------------------------------------------ handler
 
-/** The parts of an API Gateway HTTP API (payload 2.0) event this handler reads. */
-export type HttpEvent = {
-  headers?: Record<string, string | undefined>;
-  body?: string | null;
-  isBase64Encoded?: boolean;
-  requestContext?: { http?: { method?: string } };
-};
-
-export type HttpResult = {
-  statusCode: number;
-  headers: Record<string, string>;
-  body: string;
-};
-
-const json = (statusCode: number, body: unknown): HttpResult => ({
-  statusCode,
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(body),
-});
-
-function isAuthorised(header: string | undefined, token: string | undefined): boolean {
-  if (!token || !header?.startsWith('Bearer ')) return false;
-  const given = Buffer.from(header.slice('Bearer '.length));
-  const expected = Buffer.from(token);
-  return given.length === expected.length && timingSafeEqual(given, expected);
-}
-
 export const handler = async (event: HttpEvent): Promise<HttpResult> => {
-  if (event.requestContext?.http?.method && event.requestContext.http.method !== 'POST') {
-    return json(405, { error: 'method_not_allowed' });
-  }
-  const headers = Object.fromEntries(Object.entries(event.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
-  if (!isAuthorised(headers.authorization, process.env.INTAKE_TOKEN)) {
-    return json(401, { error: 'unauthorised' });
-  }
-
-  let raw: unknown;
-  try {
-    const text = event.isBase64Encoded ? Buffer.from(event.body ?? '', 'base64').toString('utf8') : event.body ?? '';
-    raw = JSON.parse(text);
-  } catch {
-    return json(400, { error: 'invalid_json' });
-  }
-  const parsed = EnquiryPayload.safeParse(raw);
+  const request = readAuthorisedJson(event, process.env.INTAKE_TOKEN);
+  if ('error' in request) return request.error;
+  const parsed = EnquiryPayload.safeParse(request.body);
   if (!parsed.success) {
     return json(400, {
       error: 'invalid_payload',
