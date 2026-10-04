@@ -74,6 +74,8 @@ export const IDS = {
     fields: {
       /** inverse of enquiryRoutingRule.assignTo */
       enquiryRoutingRules: '31d901f7-1e00-47e4-8523-184621a2cfee',
+      /** inverse of pricingPublication.publishedBy */
+      pricingPublications: '7d277f8e-daec-4459-9859-8777979dd975',
     },
   },
 
@@ -263,39 +265,70 @@ export const IDS = {
 
   // ------------------------------------------------------ C1 pricing engine
 
-  pricingStrategy: {
-    object: '4a93d535-2940-4f78-b099-6b036937eab8',
+  offering: {
+    object: '6deea92f-cc85-4ff4-b64f-c1e705561167',
     fields: {
-      name: '520b9c13-b66b-45b7-ab5f-37b92206c324',
-      correlationId: 'd4405c9e-ba52-4052-805a-10f53c39d7e0',
-      strategyType: '5bc32922-0be6-41ca-b291-7e85e22ca2e9',
-      description: 'a97bc8ca-dc4a-4672-81ff-80750be9f313',
-      isActive: 'a0b7cce5-ee7d-462f-b827-4bbb5ca6c436',
-      validFrom: '57912e6e-6493-45a2-84c6-547d547fc82c',
-      validUntil: '1862e2be-ffc0-4cc6-a003-e50f4f4586ac',
-      displayMode: '59706016-bf06-48b0-a711-043333cb7c74',
-      sortOrder: '0581954c-ba0d-48e8-8d26-822945505772',
-      itemCount: '383ccb1c-da68-45f2-9823-0483c212b5fe',
-      /** inverse of priceItem.strategy */
-      items: '0419f7fe-7270-4e08-994c-83b8282bfcfb',
+      name: 'e6bb8a14-5e10-4b10-894b-049b6f4883d6',
+      offeringCode: '6806d44c-abf3-4e52-b874-2cedf00b1579',
+      productCategory: 'b4555d31-e53b-43a9-8557-60c88c2c2ae6',
+      strategyType: '780ec9c9-7566-440a-b076-fe2a87b5e005',
+      displayFormat: '491b93f3-5b02-4603-81a4-435e0f395625',
+      fromPrefix: 'c46a78cb-1161-4129-85a7-3addc9d463be',
+      hasOptionalExtras: 'f29039cc-0f28-4448-87eb-3b10be0e8e08',
+      isActive: 'a8c38da3-cfa5-41eb-b520-a1de2e3cdbc7',
+      description: '9c49604b-d24b-4bb6-9b07-f1baa96587d1',
+      features: '2e1a480a-d4a6-40bf-aa1f-af6557e0495c',
+      validFrom: '2ad0a6d5-8ae1-4cbf-8c9e-e7e760a78ac5',
+      validUntil: '83ec3193-9a7e-4267-8b1f-077e48f4bd9c',
+      sortOrder: 'bae00a92-017c-49c7-aaa2-a7dab33ba3d3',
+      /** inverse of pricePoint.offering */
+      pricePoints: '05eafecd-0f84-423b-84f4-ce6cdc50611e',
+      /** inverse of bundleItem.bundle */
+      bundleItems: '6a7e5aa1-c4fb-4250-8eca-7fc5f38967eb',
+      /** inverse of bundleItem.component */
+      componentOf: '16572dd0-07d5-4b22-9215-f3c04bf7340f',
     },
   },
 
-  priceItem: {
-    object: 'ebd20485-ed8f-423a-89ff-3d1394b39f9b',
+  pricePoint: {
+    object: 'be1ff4e9-9b4c-4ac5-8f64-fbe493b890b5',
     fields: {
-      name: 'f20cb2b3-cd1c-4811-a633-72fc79ea9914',
-      strategy: '97341d0c-a84e-4ed2-8c73-e496eef95bba',
-      productLine: 'b3f73e23-19b6-42fa-ac0e-d229724ffd7c',
-      tier: '882935df-e0f1-4eeb-a6e8-4c0e80b4138e',
-      description: '00aba843-5f59-4d6f-8c2c-45ad57776b15',
-      annualFeeEur: '7315cc14-b389-4884-b7f4-0f6f07232485',
-      setupFeeEur: '7c2611de-dd47-4ca6-bb81-67a30b19107a',
-      currencyCode: '02c8046f-ec25-43fe-bcb4-de08e8072453',
-      isHighlighted: '2d745fc0-2bf0-4ec0-b970-7b053bdbe9ea',
-      isOnRequest: '5a6d4ebc-3b67-47cc-b0aa-78f5aa1750dc',
-      sortOrder: 'ee63b9b9-462f-4449-8f30-ae7c50a4d853',
-      correlationId: '004ccb5b-4fb4-47a1-9912-bda779f78bd0',
+      name: '7faf986e-dc4f-42c1-9974-5357f4218290',
+      correlationId: 'bbac2df5-e8e4-4452-a45b-a47c2851302a',
+      offering: '4230e2cb-bd63-47c4-a377-5d0316a2ca0b',
+      tier: 'b7640f40-5eee-4dc2-b4bd-777d7d809d89',
+      annualFeeEur: '62bdf285-a66f-493f-9bb8-ae45b2c03ed9',
+      setupFeeEur: '5954aa00-fa40-4204-8cd2-63ff4d805f35',
+      currencyCode: '15f9d636-da80-49d2-8612-71326191e2e5',
+      isHighlighted: '8d9361a2-5b59-440f-aaa5-10bc365d6f93',
+      isOnRequest: '66cfcdf7-45ee-48ba-a782-f5ba7c7acb50',
+      isLegacy: 'b71ed52f-713c-4f91-9bde-61f7a7058033',
+      sortOrder: '6b5c1e2a-2b22-4079-b362-bf0d1fcc6a59',
+      description: '230d1a5e-3906-4729-8aa6-59cd938ca4b6',
+    },
+  },
+
+  bundleItem: {
+    object: '26e17bec-d81e-44fd-920d-e1a35019e237',
+    fields: {
+      name: 'e99a6b02-8d33-4360-a5d7-069816c3a143',
+      bundle: '557b8666-8560-4671-b725-ecdbb6b3edb5',
+      component: 'e05292fb-991e-47db-ba13-df00cc529995',
+      included: '316bfebb-89f3-438d-8d94-70f8ae7b0edf',
+      sortOrder: '7a25dc2d-5945-4d2f-b18d-1bc5bb8904b1',
+    },
+  },
+
+  pricingPublication: {
+    object: '2cf8fff5-ae38-41d8-995c-12256bacf573',
+    fields: {
+      name: '2590f540-5cee-4537-995f-6412229fe5d3',
+      publishedAt: '144ac319-cf09-460e-918e-c1b5d26e3c0c',
+      version: '7024d52b-4a3d-4b17-8db7-e8d78dda1391',
+      publishedBy: '50603cc6-de4e-4473-bfcf-f653ab3312c4',
+      commitSha: 'ad27ce23-3cb0-4c2a-a79d-c2bf3f329986',
+      isLive: 'bee5e952-c0c0-43ac-bb2a-542ab9fcf88c',
+      notes: '93c3b250-3714-4f98-a56d-0c945fc6c239',
     },
   },
 
@@ -601,54 +634,92 @@ export const IDS = {
         '7c28b39d-5f3b-47b2-a132-b7d40220ddc8',
       ],
     },
-    pricingStrategiesTable: {
-      view: 'da31d3aa-b9e4-47ac-8063-40e9b5e4fa32',
+    offeringsTable: {
+      view: '9137b476-a497-470f-8f1f-2af09d1799e2',
       fields: [
-        '2428385b-6de1-4fd3-8f51-60f577623585',
-        'b351700c-9256-4df3-9a18-e3df1dc3f0d4',
-        'de6b2249-13e6-4120-b53c-96e5674428bd',
-        '20b970ab-d513-45ed-82c2-ede338277542',
-        '250165d5-5361-4e70-8d90-33ba937eee4c',
+        '9636c4da-0b9f-4eda-b347-0a9729654278',
+        '5760baf0-c6bc-4d74-9ae9-34592512a808',
+        'c3e7eedc-ca6a-48f5-8355-8e0291f0dac7',
+        'b133f20a-e7db-46bc-aa80-1df56307866a',
+        'ed051e34-8fec-4fed-8332-5abdc5ace711',
+        '14a83c17-9505-4330-b8cf-ed602a2c8d4d',
       ],
-      sort: 'cb18754e-52f0-442e-a2ce-40ff341bfc36',
+      sort: '58c098ab-f546-403c-b91f-796aa6b1f3fc',
     },
-    priceItemsTable: {
-      view: '0efa6a99-e86f-43e5-bd23-8ebec14a11cf',
+    pricePointsTable: {
+      view: 'f52db793-589f-4148-b103-c74b6c75c7ea',
       fields: [
-        '6e6476cc-7e17-476c-a6a1-d1729e8f2352',
-        '2d4f49a8-12f5-4ada-83b5-af4305c1a452',
-        '9a0e1b74-80d8-45af-a13d-a92eb5c80fac',
-        '83e0c8d3-9e63-49d6-abb4-902645968a69',
-        '3682a671-a4a4-4797-bca1-0c515d2b3e15',
+        'cb269927-c317-462b-967c-75bf5a2098e0',
+        '4905fa38-f730-45c0-9dd6-3636cf210905',
+        'ab300403-d742-43f4-9760-df8f5cfc4be2',
+        'd4929390-2c0c-4534-9961-53531e49817f',
+        'bf952b53-1cad-4096-9910-8572547cfe5a',
+        'aaa1b99e-46e0-474d-8217-58a86d112d4c',
       ],
-      sort: '69355e6b-ff50-43a3-af1f-441c8177181c',
+      sort: '2457e865-1f01-4120-98bc-f4c782817737',
     },
-    pricingStrategyOverviewFields: {
-      view: 'bb9cf523-079e-4636-9e1e-66b71482253b',
+    bundleItemsTable: {
+      view: '1f878958-51f4-4ac1-bdaf-d12d48399b52',
       fields: [
-        '81b8eb95-11d7-4749-bd54-6c9a938264e2',
-        'a0a8b6f6-cd22-49ee-9ae6-5994bfe9a84b',
-        '9892f016-47a8-4e3a-93f6-756cbcca66b3',
-        '47a5363d-8fbd-477d-9afc-81f27a8b46e0',
-        '592d29ee-14a3-41de-a3a6-8b3692b75d83',
-        'f94062eb-3e94-49ca-ab84-1d694ba608d6',
-        '892da0c1-9008-4cf8-a2fa-e7477507660a',
-        '8dad10f3-1da4-416d-be60-aea10fa4394e',
-        '23366032-b34b-4b05-a8d2-05e133f64208',
+        'c7e219cb-7d9e-4e98-bc1c-0bbe90d7bc8f',
+        '78174b0a-0334-49f9-841a-e9528d4be24f',
+        'b4fb7333-4578-411c-ac93-b5f29069f851',
+        '13aad2ce-6577-46de-8822-9b9784720d91',
+      ],
+      sort: 'cbdbfb5b-3fa3-453f-9021-b51f66b451f5',
+    },
+    pricingPublicationsTable: {
+      view: '1dd618ef-403c-4759-9482-b72093fe561f',
+      fields: [
+        '61b362b5-a2e5-4bab-9f42-afa133ec8915',
+        '3e128a8d-8199-45fd-966c-6672ea1ab9f7',
+        'c9c06922-221a-47f1-8e66-5691612c0adf',
+        'b174cf7b-0278-404c-b177-dda45627ff94',
+        'f81addd6-59ed-4b58-bf6b-f84032b2106d',
+      ],
+      sort: '72032992-8d3b-4dee-aa45-70699e7b9c8b',
+    },
+    offeringOverviewFields: {
+      view: '7c487c62-95b0-414b-862c-71e07f71a6c4',
+      fields: [
+        '1bf6cf87-2d29-4bd3-a17e-4a8c0bb426fe',
+        '79181621-0c2d-42af-81fe-7308bbcdc609',
+        '26e2e5c7-e165-472d-be4f-de6829509c76',
+        'da7d1f64-b531-425b-a398-6e9220b4eaac',
+        'eba4aebe-eb6d-4412-80f9-65c272dc00bc',
+        '74ac5f59-5457-42e3-aea3-1c97655e2bd5',
+        '1c869005-fa08-406e-986b-81faae0c6888',
+        '58c10b00-488f-4fba-a2dd-8d70d1d63dd2',
+        '432e3e0a-ea57-41e8-a20e-dd1e0e46b7a9',
+        '139d9939-db11-4598-836a-12e50447c5ed',
+        '4824ce30-0986-4f14-86a8-4c70f828ce85',
+        '801b8265-609a-4c6d-81f5-46bd28c17ce7',
+        '444ff1a9-b98c-44c6-802a-87a09cfa758a',
       ],
     },
-    strategyPriceItemsWidget: {
-      view: '71b6a3a8-edba-4900-a8a2-8968de232c57',
+    offeringPricePointsWidget: {
+      view: '1ae66097-6b2c-46a2-907b-e35021853b92',
       fields: [
-        '037abdcd-3607-4321-8541-a1dd6d3fdfd8',
-        'a5d54d64-e4aa-4340-a322-6b8ecd01a98f',
-        'bfa85c30-93fc-41bc-a76c-ada66365cd6e',
-        'f4a84acc-d74e-4186-b7c7-dad20f5d260f',
-        'ae30b65a-556c-450b-adc6-3de428526265',
-        'e7213861-2790-4b1d-8235-c5ea6e48c5c4',
-        '0a6efcfb-fead-4999-8cf4-163d01ad2f5f',
+        '528f8998-d6bf-42c6-8bd0-9d61e250100c',
+        '1e0f856d-12c2-47cb-856a-13f993cea45a',
+        'ee11cf48-30d6-4e32-b52c-15814bc1fac2',
+        '649ec256-b125-4aad-b005-0ff798f50830',
+        'dc44287f-413b-40f9-a181-17b4b8342473',
+        'fc957fdc-2cfc-4d9d-a5dc-3db22eddc7f9',
+        'fa139eb4-b184-4815-a780-7f1a15cdd3a1',
+        'f89182f7-13cc-4c81-93ba-72c514cbf003',
       ],
-      sort: '4692047d-c1e9-402e-815e-04e000300eb9',
+      sort: '89e48094-fca8-4fd6-a58c-0933b1d77d39',
+    },
+    offeringBundleItemsWidget: {
+      view: '414296cd-e702-4ed8-ba3b-50b87579ed3f',
+      fields: [
+        '7f492a77-95e6-4fe8-9e39-2cd3f3aeb897',
+        '5934dcaa-2d1e-41a4-beae-e12a0d36ad33',
+        '3e217fec-bdb1-44b4-88fa-767b9aa61a60',
+        '03b9bf99-f168-4dec-b5ff-a4f26c858ffe',
+      ],
+      sort: '5d7fc9d6-ceeb-447e-8d87-8b38ab788080',
     },
     replyTemplatesTable: {
       view: '851e7855-99f0-4236-9526-379a11049d36',
@@ -829,16 +900,18 @@ export const IDS = {
         contacts: '89324e93-99f5-4b46-9923-60635538d353',
       },
     },
-    pricingStrategyRecord: {
-      layout: '2551cb6a-eb37-48ac-bba3-0b0ec6e32467',
+    offeringRecord: {
+      layout: '6749a7ec-d843-42ec-a5a2-cc8bd482cd85',
       tabs: {
-        overview: '9d0374e2-2609-4bc9-b11a-d8d402fc92e2',
-        priceItems: '96e6522a-690c-411a-b2e4-0c7f7c9d9651',
+        overview: 'b8c206ee-35fd-4b09-a7db-5bef0efe29c1',
+        pricePoints: 'ebf235dc-7495-4382-abea-14e7a6f9b6d9',
+        bundleItems: '90a4eeb5-0e39-42ab-b44e-007f7576289e',
       },
       widgets: {
-        pricingPreview: '5b2d1543-c6b3-4ef4-9f17-2221b558cfa3',
-        overviewFields: 'c7f604cd-100e-4d44-8dd2-c23bdce173a0',
-        priceItems: 'bb1b5aa1-a790-4496-9495-9ba65c05ce7e',
+        pricingPreview: '5d04babd-5564-411e-8c81-717a7e71ea50',
+        overviewFields: '584698a1-15ee-45f3-bf61-4b63a8708dae',
+        pricePoints: 'da6685f1-2a93-423e-8f22-0cef326c3ebd',
+        bundleItems: '36b0fba4-2d2e-452c-9b37-cb0d410f1cfc',
       },
     },
     trainingEventRecord: {

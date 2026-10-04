@@ -18,13 +18,13 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/objects/{company,person,opportunity,workspace-member}/*.field.ts   standard-object extensions (defineField)
 ├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule,
 │                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead,
-│                                    PricingStrategy, PriceItem, ReplyTemplate, LeadDiscoveryRun, DiscoveredCompany,
+│                                    Offering, PricePoint, BundleItem, PricingPublication, ReplyTemplate, LeadDiscoveryRun, DiscoveredCompany,
 │                                    TrainingRegistration, CustomerEvent (C3), ResearchBrief (D1-D2)
 ├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban,
-│                                    Product Streams table, Pricing Strategies + Price Items tables, Reply Templates table,
+│                                    Product Streams table, Offerings, Price Points, Bundle Items + Pricing Publications tables, Reply Templates table,
 │                                    Lead Discovery + Discovered Companies tables, Training Registrations table, widgets
 ├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs),
-│                                    Pricing Strategy record page (2 tabs), Training Event record page (2 tabs),
+│                                    Offering record page (3 tabs), Training Event record page (2 tabs),
 │                                    Research Brief record page (Overview / Raw Result), Today (standalone)
 ├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub), PricingDisplay (stub),
 │                                    RegisterForTrainingButton (stub)
@@ -44,7 +44,7 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── shared/icp.mjs                   freemail list + e-mail-domain → Company matching
 ├── shared/streams.mjs               the nine product streams, one per PRODUCT_CATEGORY (seed + verify read this)
 ├── shared/scoring.mjs               fair-lead score rules (A1 stub; score-fair-lead + verify read this)
-├── shared/pricing.mjs               C1 pricing: option sets, D3 display rules, canonical strategies, pricing.json transform
+├── shared/public-pricing.mjs        C1 pricing: option sets, D3 display rules, canonical offerings, PublicPricingV1 schema + pricing.json transform
 ├── shared/lead-discovery.mjs        A2: Apify actor pin, cost estimate + caps, guardrails, item mapping, discovery score rules
 ├── shared/stripe-sync.mjs           C2: CRM pricing → Stripe product/price mapping, sync plan, webhook signature check
 ├── shared/portal-events.mjs         C3: customer event types/sources, which events open a pipeline Opportunity
@@ -57,8 +57,8 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── ops/generate-all-digests.mjs     B2: one AI digest per active ProductStream via generate-stream-digest (weekly, --dry-run)
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
 ├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
-├── ops/seed-pricing.mjs             creates missing strategies + price items from shared/pricing.mjs, recounts itemCount
-├── ops/publish-pricing.mjs          live pricing → pricing.json for the website (read-only; .github/workflows/publish-pricing.yml)
+├── ops/seed-pricing.mjs             creates missing offerings, price points + bundle items from shared/public-pricing.mjs
+├── ops/publish-pricing.mjs          live pricing → validated pricing.json for the website, records a PricingPublication (.github/workflows/publish-pricing.yml)
 ├── ops/discover-leads.mjs           A2: start an Apify LinkedIn company run via run-linkedin-discovery (--dry-run, --wait)
 ├── ops/seed-training-events.mjs     creates missing TrainingEvent records from shared/training.mjs (--dry-run)
 ├── docs/logic-function-spike.md     F0.3 findings: what logic functions can do on 2.41, and the decision
@@ -120,8 +120,10 @@ SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --conf
 | Stream Document | new | title (`name`), stream→, file, version, effectiveDate, documentType |
 | Stream Contact | new | name, stream→, person→, role, notes |
 | Fair Lead | new | scanId (unique, label), person→, company→, companyName, source, productInterest (multi), notes, businessCardImage, followUpStatus, capturedAt, score, scoreBreakdown, scoredAt |
-| Pricing Strategy | new | name, correlationId (unique), strategyType, description, isActive, validFrom, validUntil, displayMode, sortOrder, itemCount (denormalised, recounted by `pricing:seed`), items |
-| Price Item | new | name, strategy→, productLine, tier, description, annualFeeEur, setupFeeEur, currencyCode, isHighlighted, isOnRequest, sortOrder, correlationId (unique) |
+| Offering | new | name, offeringCode (unique), productCategory, strategyType, displayFormat, fromPrefix, hasOptionalExtras, isActive, description, features (rich text), validFrom, validUntil, sortOrder, pricePoints, bundleItems, componentOf |
+| Price Point | new | name, correlationId (unique), offering→, tier, annualFeeEur, setupFeeEur, currencyCode, isHighlighted, isOnRequest, isLegacy, sortOrder, description |
+| Bundle Item | new | name, bundle→ (a BUNDLE offering), component→ (a non-BUNDLE offering), included, sortOrder |
+| Pricing Publication | new | name, publishedAt, version, publishedBy→ (workspace member), commitSha, isLive, notes |
 | Reply Template | new | name, category (ENQUIRY_CATEGORY + ALL), language (EN/ZH/ALL), subject, body, isActive, sortOrder |
 | Lead Discovery Run | new | name, status, source, query (JSON + actor build), resultsCount, resultsNew, costUsd, runId (unique, Apify), startedAt, completedAt, errorMessage, discoveredCompanies |
 | Discovered Company | new | discoveryRun→, companyName (label), companyNameZh, website, linkedinUrl, industry, companySize, headquarters, productCategories (multi), description, emailDomains, isExportedToCRM, exportedCompanyId, isDuplicate, score, scoreBreakdown |
@@ -133,15 +135,20 @@ Only live mandates (Active / Expiring) are checked.
 Key dates live in `shared/urgency.mjs` (Canton Fair 15 Oct 2026 — edit there;
 Battery DPP mandate 18 Feb 2027).
 
-Pricing (C1): a Pricing Strategy says HOW a product line is sold; its Price
-Items hold the EUR prices. `displayMode` controls the website (D3 defaults:
-ADD_ON → from-price, FLAT → exact total, TIERED/BUNDLE → per option,
-QUOTE_ONLY/CUSTOM → hidden, shown "On request"). `npm run pricing:publish`
-writes `pricing.json` with only live strategies and public fields, and with
-no amounts for on-request items or hidden strategies. It goes to
-integrascientific/integra-scientific by hand, since that repo is under another
-GitHub account. The "Publish pricing" workflow uploads it as an artifact; the
-steps are in `ops/publish-pricing.mjs`.
+Pricing (C1): an Offering says HOW a product is sold; its Price Points hold
+the EUR prices, and a BUNDLE offering lists its components as Bundle Items.
+`displayFormat` controls the website layout (D3 defaults: FLAT → price card,
+TIERED → tier table, BUNDLE → bundle comparison, PER_SEAT → seat pricing,
+ADD_ON → add-on list, QUOTE_ONLY → contact CTA, CUSTOM → hidden). D3 also
+makes `fromPrefix` ("from €…") true for every ADD_ON and any offering with
+`hasOptionalExtras`. `npm run pricing:publish` builds `pricing.json`
+(PublicPricingV1, validated before it is written) with only live offerings and
+public fields; legacy price points are skipped, and on-request price points
+and every price point of a contact-CTA / hidden / quote-only offering carry
+`annualFeeEur: null`. Each run records a Pricing Publication (`--dry-run` skips
+it). The file goes to integrascientific/integra-scientific by hand, since that
+repo is under another GitHub account. The "Publish pricing" workflow uploads it
+as an artifact; the steps are in `ops/publish-pricing.mjs`.
 
 LinkedIn lead discovery (A2): `npm run discover` asks the
 `run-linkedin-discovery` sidecar to start Apify's `harvestapi/linkedin-company`
@@ -221,11 +228,11 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      code is unconfirmed.
    - `StreamUpdate.updateType` is not called `type`, which Twenty reserves.
 6. C1 pricing:
-   - The Pricing Strategy record page's Price Items table (`RECORD_TABLE`)
-     has the same scoping question as item 3.
-   - `fetchPricingStrategy` in `src/lib/data.ts` (PricingDisplay preview) has
+   - The Offering record page's Price Points and Bundle Items tables
+     (`RECORD_TABLE`) have the same scoping question as item 3.
+   - `fetchOffering` in `src/lib/data.ts` (PricingDisplay preview) has
      the same generated-client caveat as item 1.
-   - `PriceItem.currencyCode` is not called `currency`, which Twenty reserves
+   - `PricePoint.currencyCode` is not called `currency`, which Twenty reserves
      (like `type`). `pricing.json` still calls it `currency`.
    - The "Pricing" sidebar item is a `VIEW` item named "Pricing", so the label
      is "Pricing" rather than the object's plural. Whether the sidebar shows
@@ -271,11 +278,15 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      plain `fetch` (no `stripe` package) and have not run against Stripe: the
      calls follow Stripe's API docs and were exercised against an in-memory
      fake only. Run `npm run stripe:sync` with a `sk_test_` key first. Products
-     are keyed by `id = strategy.correlationId`, prices by `lookup_key =
-     item.correlationId`; a changed fee makes a new price that takes the
+     are keyed by `id = offering.offeringCode`, prices by `lookup_key =
+     pricePoint.correlationId`; a changed fee makes a new price that takes the
      lookup key and archives the old one (Stripe cannot edit an amount).
-     Nothing is deleted. HIDE and out-of-window strategies get an inactive
-     product and no prices; their items count as skipped.
+     Nothing is deleted. Contact-CTA / hidden / quote-only and out-of-window
+     offerings get an inactive product and no prices; their price points count
+     as skipped, as do legacy, on-request and PER_SEAT ones (seats are bought
+     once, so a yearly price would be wrong). Products used to be keyed by
+     the old strategy `correlationId` (`dsp-2026`, …): a first sync after the
+     rewrite creates new products and moves each lookup key to the new product.
    - `stripe-webhook` needs its own API Gateway route, with no bearer: Stripe's
      signature is the authentication (`STRIPE_WEBHOOK_SECRET`). It only logs
      `price.created` / `price.updated` / `checkout.session.completed`.

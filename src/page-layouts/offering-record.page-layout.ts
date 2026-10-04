@@ -1,10 +1,11 @@
 /**
- * Pricing Strategy record page: Overview / Price Items.
+ * Offering record page: Overview / Price Points / Bundle Items.
  *
  * Overview leads with the PricingDisplay preview (how the website will show
- * this strategy, via the same transform as ops/publish-pricing.mjs), then a
- * FIELDS widget (views/pricing-strategy-overview-fields.view.ts). Price Items
- * is a RECORD_TABLE widget (views/strategy-price-items.view.ts).
+ * this offering, via the same transform as ops/publish-pricing.mjs), then a
+ * FIELDS widget (views/offering-overview-fields.view.ts). Price Points and
+ * Bundle Items are RECORD_TABLE widgets backed by TABLE_WIDGET views
+ * (views/offering-price-points.view.ts, views/offering-bundle-items.view.ts).
  */
 import {
   definePageLayout,
@@ -15,16 +16,16 @@ import {
 } from '../lib/sdk';
 import { IDS } from '../ids';
 
-const L = IDS.pageLayouts.pricingStrategyRecord;
+const L = IDS.pageLayouts.offeringRecord;
 
 const FIT = PageLayoutWidgetVerticalListHeightBehavior.FIT_CONTENT;
 const FILL = PageLayoutWidgetVerticalListHeightBehavior.TAB_VIEWPORT;
 
 export default definePageLayout({
   universalIdentifier: L.layout,
-  name: 'Pricing Strategy',
+  name: 'Offering',
   type: PageLayoutType.RECORD_PAGE,
-  objectUniversalIdentifier: IDS.pricingStrategy.object,
+  objectUniversalIdentifier: IDS.offering.object,
   tabs: [
     {
       universalIdentifier: L.tabs.overview,
@@ -49,27 +50,47 @@ export default definePageLayout({
           type: WidgetType.FIELDS,
           configuration: {
             configurationType: 'FIELDS',
-            viewUniversalIdentifier: IDS.views.pricingStrategyOverviewFields.view,
+            viewUniversalIdentifier: IDS.views.offeringOverviewFields.view,
           },
           heightBehavior: FIT,
         },
       ],
     },
     {
-      universalIdentifier: L.tabs.priceItems,
-      title: 'Price Items',
+      universalIdentifier: L.tabs.pricePoints,
+      title: 'Price Points',
       icon: 'IconCurrencyEuro',
       position: 1,
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
         {
-          universalIdentifier: L.widgets.priceItems,
-          title: 'Price Items',
+          universalIdentifier: L.widgets.pricePoints,
+          title: 'Price Points',
           type: WidgetType.RECORD_TABLE,
-          objectUniversalIdentifier: IDS.priceItem.object,
+          objectUniversalIdentifier: IDS.pricePoint.object,
           configuration: {
             configurationType: 'RECORD_TABLE',
-            viewUniversalIdentifier: IDS.views.strategyPriceItemsWidget.view,
+            viewUniversalIdentifier: IDS.views.offeringPricePointsWidget.view,
+          },
+          heightBehavior: FILL,
+        },
+      ],
+    },
+    {
+      universalIdentifier: L.tabs.bundleItems,
+      title: 'Bundle Items',
+      icon: 'IconPackages',
+      position: 2,
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier: L.widgets.bundleItems,
+          title: 'Bundle Items',
+          type: WidgetType.RECORD_TABLE,
+          objectUniversalIdentifier: IDS.bundleItem.object,
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewUniversalIdentifier: IDS.views.offeringBundleItemsWidget.view,
           },
           heightBehavior: FILL,
         },

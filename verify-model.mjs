@@ -28,11 +28,14 @@
  *      (unique slugs), the fair-lead intake and score weights cover the same
  *      values, the score rules give the expected scores, and no custom object
  *      redeclares a Twenty system field (createdAt, …).
- *  12. C1 pricing: shared/pricing.mjs D3 display rules cover every strategy
- *      type, its tiers match the TIER select, the seed is three four-tier
- *      ladders (Boss on request, Bundle = DPP + AR less the discount), and
- *      buildPublicPricing publishes only live strategies, only public fields,
- *      and no amounts for on-request items or HIDE strategies.
+ *  12. C1 pricing: Offering / PricePoint / BundleItem / PricingPublication
+ *      declare the plan's fields; shared/public-pricing.mjs D3 rules (display
+ *      format per type, "from" prefix for ADD_ON / optional extras, no amounts
+ *      for CTA / hidden / quote-only) cover every strategy type; the seed is
+ *      the plan's eight offerings (Bundle = DPP + AR less the discount, Boss on
+ *      request); buildPublicPricing publishes only live offerings, skips legacy
+ *      price points, and its PublicPricingV1 output passes the schema, which
+ *      rejects leaks and malformed documents.
  *  13. E2 reply templates: the seed is one template per category × EN/ZH
  *      (catch-all = ALL), its option values match the ReplyTemplate selects,
  *      the subject placeholders are only {{reference}}, and selectTemplate
@@ -47,7 +50,7 @@
  *  16. X5 training: the three seed events use real option values, a past
  *      event is closed, and the registration statuses are as specified.
  *  17. C2 Stripe sync: the pricing seed maps to Stripe products and prices
- *      (EUR cents, on-request and HIDE skipped, metadata), the plan is
+ *      (EUR cents, on-request / legacy / per-seat / hidden skipped, metadata), the plan is
  *      idempotent, and the webhook signature check accepts only a valid one.
  *  18. C3 portal sync: the event types and sources are as specified, only a
  *      purchase or renewal touches the pipeline, and on the Subscribed stage.
@@ -56,7 +59,7 @@
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -71,7 +74,7 @@ const EXPECTED_OBJECTS = [
   'ArMandate', 'MandateProduct', 'TrainingEvent', 'Authority',
   'Enquiry', 'EnquiryMessage', 'EnquiryRoutingRule',
   'ProductStream', 'StreamUpdate', 'StreamDocument', 'StreamContact', 'FairLead',
-  'PricingStrategy', 'PriceItem',
+  'Offering', 'PricePoint', 'BundleItem', 'PricingPublication',
   'ReplyTemplate',
   'LeadDiscoveryRun', 'DiscoveredCompany',
   'TrainingRegistration',
@@ -354,112 +357,247 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 // ------------------------------------------------------------ 12. C1 pricing
 {
   const problems = [];
-  const p = await import(pathToFileURL(join(ROOT, 'shared/pricing.mjs')).href);
+  const p = await import(pathToFileURL(join(ROOT, 'shared/public-pricing.mjs')).href);
   const values = (rows) => rows.map((r) => r.value);
 
-  // D3 display rules.
-  const D3 = {
-    ADD_ON: 'SHOW_FROM_PRICE',
-    FLAT: 'SHOW_EXACT_TOTAL',
-    TIERED: 'SHOW_PER_OPTION',
-    BUNDLE: 'SHOW_PER_OPTION',
-    QUOTE_ONLY: 'HIDE',
-    CUSTOM: 'HIDE',
-  };
-  for (const [type, mode] of Object.entries(D3)) {
-    if (p.DISPLAY_MODE_FOR_TYPE[type] !== mode) problems.push(`D3: ${type} → ${p.DISPLAY_MODE_FOR_TYPE[type]}, want ${mode}`);
+  // The old model is gone.
+  for (const gone of ['shared/pricing.mjs', 'src/objects/price-item.object.ts', 'src/objects/pricing-strategy.object.ts', 'src/views/strategy-price-items.view.ts']) {
+    if (existsSync(join(ROOT, gone))) problems.push(`${gone} must be deleted`);
   }
+
+  // Object structure, from the source: every plan field is declared, by name.
+  const PLAN_FIELDS = {
+    'src/objects/offering.object.ts': ['name', 'offeringCode', 'productCategory', 'strategyType', 'displayFormat', 'fromPrefix', 'hasOptionalExtras', 'isActive', 'description', 'features', 'validFrom', 'validUntil', 'sortOrder', /* relation inverses: */ 'pricePoints', 'bundleItems', 'componentOf'],
+    'src/objects/price-point.object.ts': ['name', 'correlationId', 'offering', 'tier', 'annualFeeEur', 'setupFeeEur', 'currencyCode', 'isHighlighted', 'isOnRequest', 'isLegacy', 'sortOrder', 'description'],
+    'src/objects/bundle-item.object.ts': ['name', 'bundle', 'component', 'included', 'sortOrder'],
+    'src/objects/pricing-publication.object.ts': ['name', 'publishedAt', 'version', 'publishedBy', 'commitSha', 'isLive', 'notes'],
+  };
+  for (const [file, names] of Object.entries(PLAN_FIELDS)) {
+    const src = stripComments(read(file));
+    const declared = [...src.matchAll(/\bname: '([A-Za-z]+)',\s*\n\s*label:/g)].map((m) => m[1]);
+    const missing = names.filter((n) => !declared.includes(n));
+    const extra = declared.filter((n) => !names.includes(n));
+    if (missing.length || extra.length) problems.push(`${file}: fields missing [${missing}] extra [${extra}] `);
+  }
+  const bundleSrc = read('src/objects/bundle-item.object.ts');
+  if (!bundleSrc.includes('must be a BUNDLE strategyType offering') || !bundleSrc.includes('must be a non-BUNDLE offering')) problems.push('bundle-item: field descriptions must state the bundle / component rules');
+  if (/\bname: 'currency'/.test(read('src/objects/price-point.object.ts'))) problems.push('price-point: Twenty reserves `currency`, use currencyCode');
+  const offeringSrc = read('src/objects/offering.object.ts');
+  if (!/uniqueText\(\{\s*universalIdentifier: F\.offeringCode/.test(offeringSrc)) problems.push('offering.offeringCode must be uniqueText');
+  if (!/uniqueText\(\{\s*universalIdentifier: F\.correlationId/.test(read('src/objects/price-point.object.ts'))) problems.push('price-point.correlationId must be uniqueText');
+  for (const file of ['offerings-table', 'price-points-table', 'bundle-items-table', 'pricing-publications-table']) {
+    if (!existsSync(join(ROOT, `src/views/${file}.view.ts`))) problems.push(`src/views/${file}.view.ts missing`);
+  }
+  const layoutSrc = read('src/page-layouts/offering-record.page-layout.ts');
+  for (const tab of ["'Overview'", "'Price Points'", "'Bundle Items'"]) if (!layoutSrc.includes(`title: ${tab}`)) problems.push(`offering-record page layout lacks the ${tab} tab`);
+  for (const view of ['offering-price-points', 'offering-bundle-items']) {
+    if (!/type: ViewType\.TABLE_WIDGET/.test(read(`src/views/${view}.view.ts`))) problems.push(`${view} must be a TABLE_WIDGET view`);
+  }
+  if (!read('src/navigation/pricing.nav.ts').includes('IDS.views.offeringsTable.view')) problems.push('Pricing nav must open the Offerings table');
+
+  // Select options: the object sources and shared agree.
   const types = values(p.STRATEGY_TYPES);
-  const modes = values(p.DISPLAY_MODES);
-  const uncovered = types.filter((t) => !modes.includes(p.DISPLAY_MODE_FOR_TYPE[t]));
-  if (uncovered.length) problems.push(`DISPLAY_MODE_FOR_TYPE lacks a valid mode for ${uncovered.join(', ')}`);
+  const formats = values(p.DISPLAY_FORMATS);
+  if (JSON.stringify(types.slice().sort()) !== JSON.stringify(['ADD_ON', 'BUNDLE', 'CUSTOM', 'FLAT', 'PER_SEAT', 'QUOTE_ONLY', 'TIERED'])) problems.push(`strategy types [${types}]`);
+  if (JSON.stringify(formats.slice().sort()) !== JSON.stringify(['ADD_ON_LIST', 'BUNDLE_COMPARISON', 'CONTACT_CTA', 'HIDDEN', 'PRICE_CARD', 'SEAT_PRICING', 'TIER_TABLE'])) problems.push(`display formats [${formats}]`);
+  if (JSON.stringify(values(p.CURRENCIES)) !== JSON.stringify(['EUR', 'CNY', 'USD', 'GBP'])) problems.push('currencies must be EUR/CNY/USD/GBP');
+
+  // D3 display rules: format per type, "from" prefix, amounts hidden.
+  const D3 = {
+    FLAT: 'PRICE_CARD',
+    TIERED: 'TIER_TABLE',
+    BUNDLE: 'BUNDLE_COMPARISON',
+    PER_SEAT: 'SEAT_PRICING',
+    ADD_ON: 'ADD_ON_LIST',
+    QUOTE_ONLY: 'CONTACT_CTA',
+    CUSTOM: 'HIDDEN',
+  };
+  for (const [type, format] of Object.entries(D3)) {
+    if (p.DISPLAY_FORMAT_FOR_TYPE[type] !== format) problems.push(`D3: ${type} → ${p.DISPLAY_FORMAT_FOR_TYPE[type]}, want ${format}`);
+  }
+  const uncovered = types.filter((t) => !formats.includes(p.DISPLAY_FORMAT_FOR_TYPE[t]));
+  if (uncovered.length) problems.push(`DISPLAY_FORMAT_FOR_TYPE lacks a valid format for ${uncovered.join(', ')}`);
+  const fromCases = [
+    [{ strategyType: 'ADD_ON' }, true],
+    [{ strategyType: 'FLAT', hasOptionalExtras: true }, true],
+    [{ strategyType: 'FLAT' }, false],
+    [{ strategyType: 'TIERED', fromPrefix: true }, true],
+    [{ strategyType: 'TIERED', hasOptionalExtras: false, fromPrefix: false }, false],
+  ];
+  for (const [o, want] of fromCases) if (p.fromPrefixFor(o) !== want) problems.push(`D3: fromPrefixFor(${JSON.stringify(o)}) !== ${want}`);
+  if (!p.hidesAmounts({ strategyType: 'FLAT', displayFormat: 'CONTACT_CTA' }) || !p.hidesAmounts({ strategyType: 'FLAT', displayFormat: 'HIDDEN' }) || !p.hidesAmounts({ strategyType: 'QUOTE_ONLY', displayFormat: 'PRICE_CARD' }) || p.hidesAmounts({ strategyType: 'TIERED' })) {
+    problems.push('D3: CONTACT_CTA / HIDDEN / QUOTE_ONLY hide amounts, nothing else does');
+  }
 
   const optionsSource = read('src/options.ts');
   const tierBlock = /export const TIER = options\(\[([\s\S]*?)\]\);/.exec(optionsSource)?.[1] ?? '';
   const tiers = [...tierBlock.matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
   if (JSON.stringify(values(p.PRICE_TIERS)) !== JSON.stringify(tiers)) {
-    problems.push(`shared/pricing.mjs PRICE_TIERS [${values(p.PRICE_TIERS).join(', ')}] ≠ TIER [${tiers.join(', ')}]`);
+    problems.push(`shared/public-pricing.mjs PRICE_TIERS [${values(p.PRICE_TIERS).join(', ')}] ≠ TIER [${tiers.join(', ')}]`);
   }
 
-  // Seed: three four-tier ladders.
-  const seed = p.PRICING_STRATEGIES;
-  const allItems = seed.flatMap((s) => s.items);
-  const keys = [...seed.map((s) => s.correlationId), ...allItems.map((i) => i.correlationId)];
-  if (new Set(keys).size !== keys.length) problems.push('shared/pricing.mjs: duplicate correlationIds');
-  if (keys.some((k) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(k))) problems.push('shared/pricing.mjs: correlationIds must be kebab-case');
-  const lines = values(p.PRICE_PRODUCT_LINES);
-  for (const s of seed) {
-    if (!types.includes(s.strategyType)) problems.push(`${s.correlationId}: unknown strategyType ${s.strategyType}`);
-    if (s.displayMode !== p.DISPLAY_MODE_FOR_TYPE[s.strategyType]) problems.push(`${s.correlationId}: displayMode ${s.displayMode} breaks D3`);
-    if (JSON.stringify(s.items.map((i) => i.tier)) !== JSON.stringify(tiers)) problems.push(`${s.correlationId}: items are not one per tier in order`);
-    for (const i of s.items) {
-      if (!lines.includes(i.productLine)) problems.push(`${i.correlationId}: unknown productLine ${i.productLine}`);
-      const boss = i.tier === 'BOSS';
-      if (boss !== i.isOnRequest || boss !== (i.annualFeeEur === null)) {
-        problems.push(`${i.correlationId}: Boss (and only Boss) must be on request with no fee`);
-      }
-    }
-  }
-  const fee = (line, tier) => allItems.find((i) => i.productLine === line && i.tier === tier)?.annualFeeEur;
-  for (const tier of tiers.filter((t) => t !== 'BOSS')) {
-    const want = Math.round((fee('DPP', tier) + fee('AR', tier)) * (1 - p.BUNDLE_DISCOUNT) * 100) / 100;
-    if (fee('BUNDLE', tier) !== want) problems.push(`Bundle ${tier} = ${fee('BUNDLE', tier)}, want DPP + AR less ${p.BUNDLE_DISCOUNT * 100}% = ${want}`);
-  }
-
-  // Transform: seed as REST records, plus an inactive, an expired and a HIDE strategy.
-  let n = 0;
-  const strategies = [];
-  const items = [];
-  const add = (s, extra = {}) => {
-    const id = `s${(n += 1)}`;
-    strategies.push({ ...s, ...extra, id, description: { markdown: s.description, blocknote: null } });
-    items.push(...s.items.map((i) => ({ ...i, id: `${id}-${i.correlationId}`, strategyId: id, description: 'internal' })));
+  // Seed: the canonical offerings from the plan.
+  const seed = p.OFFERINGS;
+  const byCode = Object.fromEntries(seed.map((o) => [o.offeringCode, o]));
+  const allPoints = seed.flatMap((o) => o.pricePoints);
+  const codes = seed.map((o) => o.offeringCode);
+  const keys = allPoints.map((x) => x.correlationId);
+  if (new Set([...codes, ...keys]).size !== codes.length + keys.length) problems.push('shared/public-pricing.mjs: duplicate offeringCodes / correlationIds');
+  if (codes.some((c) => !/^[A-Z][A-Z0-9_]*$/.test(c))) problems.push('offeringCodes must be UPPER_SNAKE');
+  if (keys.some((k) => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(k))) problems.push('correlationIds must be kebab-case');
+  const PLAN = {
+    DPP_SUBSCRIPTION: ['TIERED', 'TIER_TABLE', [950, 2500, 6000, null]],
+    AR: ['TIERED', 'TIER_TABLE', [250, 1200, 3000, null]],
+    AR_DPP_BUNDLE: ['BUNDLE', 'BUNDLE_COMPARISON', [1020, 3145, 7650, null]],
+    EPREL_REGISTRATION: ['FLAT', 'PRICE_CARD', [500]],
+    BATTERY_PASSPORT: ['ADD_ON', 'ADD_ON_LIST', [1500]],
+    TRAINING_LIVE: ['PER_SEAT', 'SEAT_PRICING', [150]],
+    TRAINING_RECORDED: ['PER_SEAT', 'SEAT_PRICING', [89]],
+    BOSS: ['QUOTE_ONLY', 'CONTACT_CTA', [null]],
   };
-  seed.forEach((s) => add(s));
-  add(seed[0], { correlationId: 'inactive', isActive: false });
-  add(seed[0], { correlationId: 'expired', validUntil: '2026-06-30' });
-  add(seed[0], { correlationId: 'quote', strategyType: 'QUOTE_ONLY', displayMode: null, sortOrder: 9 });
-  const now = new Date('2026-10-04T12:00:00Z');
-  const pub = p.buildPublicPricing(strategies.slice().reverse(), items, now);
-  const ids = pub.strategies.map((s) => s.id);
-  if (JSON.stringify(ids) !== JSON.stringify([...seed.map((s) => s.correlationId), 'quote'])) {
-    problems.push(`published strategies [${ids.join(', ')}]: want live only, in sortOrder`);
-  }
-  if (pub.publishedAt !== now.toISOString()) problems.push('publishedAt is not the ISO timestamp');
-  const STRATEGY_KEYS = ['id', 'name', 'type', 'description', 'displayMode', 'items'];
-  const ITEM_KEYS = ['correlationId', 'name', 'tier', 'tierLabel', 'annualFeeEur', 'setupFeeEur', 'currency', 'isHighlighted', 'isOnRequest'];
-  for (const s of pub.strategies) {
-    if (JSON.stringify(Object.keys(s)) !== JSON.stringify(STRATEGY_KEYS)) problems.push(`strategy keys [${Object.keys(s)}]`);
-    for (const i of s.items) {
-      if (JSON.stringify(Object.keys(i)) !== JSON.stringify(ITEM_KEYS)) problems.push(`item keys [${Object.keys(i)}]`);
-      if (i.isOnRequest && (i.annualFeeEur !== null || i.setupFeeEur !== null)) problems.push(`${i.correlationId}: on request but carries an amount`);
+  if (JSON.stringify(codes) !== JSON.stringify(Object.keys(PLAN))) problems.push(`seed offerings [${codes}] ≠ plan [${Object.keys(PLAN)}]`);
+  for (const [code, [type, format, fees]] of Object.entries(PLAN)) {
+    const o = byCode[code];
+    if (!o) continue;
+    if (o.strategyType !== type || o.displayFormat !== format) problems.push(`${code}: ${o.strategyType}/${o.displayFormat}, want ${type}/${format}`);
+    if (o.displayFormat !== p.DISPLAY_FORMAT_FOR_TYPE[o.strategyType]) problems.push(`${code}: displayFormat ${o.displayFormat} breaks D3`);
+    if (o.fromPrefix !== p.fromPrefixFor(o)) problems.push(`${code}: fromPrefix ${o.fromPrefix} breaks D3 (ADD_ON / hasOptionalExtras)`);
+    if (JSON.stringify(o.pricePoints.map((x) => x.annualFeeEur)) !== JSON.stringify(fees)) problems.push(`${code}: fees [${o.pricePoints.map((x) => x.annualFeeEur)}], want [${fees}]`);
+    for (const x of o.pricePoints) {
+      if ((x.annualFeeEur === null) !== x.isOnRequest) problems.push(`${x.correlationId}: on request iff no fee`);
+      if (x.currencyCode !== 'EUR' || x.isLegacy) problems.push(`${x.correlationId}: seed prices are EUR and not legacy`);
+    }
+    if (type === 'TIERED' || type === 'BUNDLE') {
+      if (JSON.stringify(o.pricePoints.map((x) => x.tier)) !== JSON.stringify(tiers)) problems.push(`${code}: price points are not one per tier in order`);
+      if (o.pricePoints.some((x) => (x.tier === 'BOSS') !== x.isOnRequest)) problems.push(`${code}: Boss (and only Boss) must be on request`);
     }
   }
-  const quote = pub.strategies.find((s) => s.id === 'quote');
-  if (quote?.displayMode !== 'HIDE' || quote.items.some((i) => !i.isOnRequest)) problems.push('QUOTE_ONLY strategy not published as HIDE with every item on request');
-  const dpp = pub.strategies[0];
+  const fee = (code, tier) => byCode[code]?.pricePoints.find((x) => x.tier === tier)?.annualFeeEur;
+  for (const tier of tiers.filter((t) => t !== 'BOSS')) {
+    const want = Math.round((fee('DPP_SUBSCRIPTION', tier) + fee('AR', tier)) * (1 - p.BUNDLE_DISCOUNT) * 100) / 100;
+    if (fee('AR_DPP_BUNDLE', tier) !== want) problems.push(`Bundle ${tier} = ${fee('AR_DPP_BUNDLE', tier)}, want DPP + AR less ${p.BUNDLE_DISCOUNT * 100}% = ${want}`);
+  }
+
+  // Bundle items: the seed obeys the rules, and the rules reject what they should.
+  for (const b of p.BUNDLE_ITEMS) {
+    const problem = p.bundleItemProblem(byCode[b.bundle], byCode[b.component]);
+    if (problem) problems.push(`seed bundle item ${b.bundle} → ${b.component}: ${problem}`);
+  }
+  if (JSON.stringify(p.BUNDLE_ITEMS.map((b) => b.component)) !== JSON.stringify(['DPP_SUBSCRIPTION', 'AR'])) problems.push('the AR + DPP bundle is DPP + AR');
+  if (!p.bundleItemProblem(byCode.AR, byCode.DPP_SUBSCRIPTION)) problems.push('a bundle item whose bundle is not BUNDLE must be rejected');
+  if (!p.bundleItemProblem(byCode.AR_DPP_BUNDLE, byCode.AR_DPP_BUNDLE)) problems.push('a bundle item whose component is a BUNDLE must be rejected');
+
+  // Transform: seed as REST records, plus an inactive, an expired, a quote-only and a no-CTA-leak offering.
+  let n = 0;
+  const offerings = [];
+  const pricePoints = [];
+  const add = (o, extra = {}) => {
+    const id = `o${(n += 1)}`;
+    offerings.push({ ...o, ...extra, id, description: { markdown: o.description, blocknote: null }, features: { markdown: (o.features ?? []).map((f) => `- ${f}`).join('\n'), blocknote: null } });
+    pricePoints.push(...o.pricePoints.map((x) => ({ ...x, id: `${id}-${x.correlationId}`, offeringId: id, description: x.description })));
+    return id;
+  };
+  seed.forEach((o) => add(o));
+  const idOf = (code) => offerings.find((o) => o.offeringCode === code).id;
+  const bundleItems = [
+    { id: 'b1', bundleId: idOf('AR_DPP_BUNDLE'), componentId: idOf('AR'), included: true, sortOrder: 1 },
+    { id: 'b2', bundleId: idOf('AR_DPP_BUNDLE'), componentId: idOf('DPP_SUBSCRIPTION'), included: true, sortOrder: 0 },
+    { id: 'b3', bundleId: idOf('AR_DPP_BUNDLE'), componentId: idOf('EPREL_REGISTRATION'), included: false, sortOrder: 2 },
+    { id: 'b4', bundleId: idOf('AR'), componentId: idOf('DPP_SUBSCRIPTION'), included: true, sortOrder: 0 },
+  ];
+  add({ ...seed[0], offeringCode: 'INACTIVE' }, { isActive: false });
+  add({ ...seed[0], offeringCode: 'EXPIRED' }, { validUntil: '2026-06-30' });
+  add({ ...seed[0], offeringCode: 'FUTURE' }, { validFrom: '2027-01-01' });
+  add({ ...seed[0], offeringCode: 'LASTDAY' }, { validUntil: '2026-10-04', sortOrder: 100 });
+  add({ ...seed[3], offeringCode: 'LEAKY' }, { strategyType: 'QUOTE_ONLY', displayFormat: 'PRICE_CARD', sortOrder: 101 });
+  add({ ...seed[3], offeringCode: 'EXTRAS' }, { hasOptionalExtras: true, fromPrefix: false, sortOrder: 102 });
+  const legacyPoint = { ...pricePoints.find((x) => x.correlationId === 'ar-boost-2026'), id: 'legacy', correlationId: 'ar-boost-2025', isLegacy: true };
+  pricePoints.push(legacyPoint);
+  const now = new Date('2026-10-04T12:00:00Z');
+  const pub = p.buildPublicPricing({ offerings: offerings.slice().reverse(), pricePoints, bundleItems }, { now, version: '2026-10-04.1' });
+  const pubCodes = pub.offerings.map((o) => o.offeringCode);
+  if (JSON.stringify(pubCodes) !== JSON.stringify([...codes, 'LASTDAY', 'LEAKY', 'EXTRAS'])) {
+    problems.push(`published offerings [${pubCodes.join(', ')}]: want active + inside validFrom..validUntil (inclusive), in sortOrder`);
+  }
+  if (pub.publishedAt !== now.toISOString() || pub.version !== '2026-10-04.1') problems.push('publishedAt / version');
+  if (JSON.stringify(Object.keys(pub)) !== JSON.stringify(['publishedAt', 'version', 'offerings'])) problems.push(`document keys [${Object.keys(pub)}]`);
+  const OFFERING_KEYS = ['offeringCode', 'name', 'strategyType', 'displayFormat', 'fromPrefix', 'description', 'features', 'pricePoints', 'bundleOf'];
+  const POINT_KEYS = ['correlationId', 'tier', 'annualFeeEur', 'currency', 'isOnRequest', 'isHighlighted', 'description'];
+  for (const o of pub.offerings) {
+    if (JSON.stringify(Object.keys(o)) !== JSON.stringify(OFFERING_KEYS)) problems.push(`offering keys [${Object.keys(o)}]`);
+    for (const x of o.pricePoints) {
+      if (JSON.stringify(Object.keys(x)) !== JSON.stringify(POINT_KEYS)) problems.push(`price point keys [${Object.keys(x)}]`);
+      if (x.isOnRequest && x.annualFeeEur !== null) problems.push(`${x.correlationId}: on request but carries an amount`);
+    }
+  }
+  const pubBy = (code) => pub.offerings.find((o) => o.offeringCode === code);
+  if (pubBy('AR').pricePoints.some((x) => x.correlationId === 'ar-boost-2025')) problems.push('isLegacy price points must be skipped entirely');
+  if (pubBy('AR').pricePoints.length !== 4) problems.push('AR publishes its four tiers');
+  const boss = pubBy('BOSS');
+  if (boss?.displayFormat !== 'CONTACT_CTA' || boss.pricePoints.some((x) => !x.isOnRequest || x.annualFeeEur !== null)) problems.push('Boss not published as CONTACT_CTA with every price on request');
+  const leaky = pubBy('LEAKY');
+  if (leaky?.pricePoints.some((x) => x.annualFeeEur !== null || !x.isOnRequest)) problems.push('a QUOTE_ONLY offering must never publish an amount, whatever its displayFormat');
+  const dpp = pubBy('DPP_SUBSCRIPTION');
   if (dpp?.description !== seed[0].description) problems.push('description not published as markdown');
-  if (JSON.stringify(dpp?.items[0]) !== JSON.stringify({
-    correlationId: 'dpp-beginner-2026', name: 'DPP Beginner', tier: 'BEGINNER', tierLabel: 'Beginner',
-    annualFeeEur: 950, setupFeeEur: null, currency: 'EUR', isHighlighted: false, isOnRequest: false,
-  })) problems.push(`dpp-beginner-2026 published as ${JSON.stringify(dpp?.items[0])}`);
+  if (JSON.stringify(dpp?.pricePoints[0]) !== JSON.stringify({
+    correlationId: 'dpp-beginner-2026', tier: 'BEGINNER', annualFeeEur: 950, currency: 'EUR', isOnRequest: false, isHighlighted: false, description: '',
+  })) problems.push(`dpp-beginner-2026 published as ${JSON.stringify(dpp?.pricePoints[0])}`);
+  if (dpp.pricePoints[3].annualFeeEur !== null || !dpp.pricePoints[3].isOnRequest) problems.push('an on-request price point publishes annualFeeEur null');
+  if (pubBy('BATTERY_PASSPORT').fromPrefix !== true || pubBy('EXTRAS').fromPrefix !== true || pubBy('EPREL_REGISTRATION').fromPrefix !== false) problems.push('fromPrefix: ADD_ON and hasOptionalExtras publish true (D3), a plain FLAT false');
+  if (JSON.stringify(pubBy('AR_DPP_BUNDLE').bundleOf) !== JSON.stringify(['DPP_SUBSCRIPTION', 'AR'])) problems.push(`bundleOf ${JSON.stringify(pubBy('AR_DPP_BUNDLE').bundleOf)}: want the included components in sortOrder`);
+  if (pubBy('AR').bundleOf.length || pubBy('DPP_SUBSCRIPTION').bundleOf.length) problems.push('only a BUNDLE offering has bundleOf');
+  if (JSON.stringify(p.featuresOf('- One\n* Two\n\n3. Three\n  Four')) !== '["One","Two","Three","Four"]') problems.push('featuresOf strips list markers and blank lines');
+  if (p.nextVersion([{ version: '2026-10-04.1' }, { version: '2026-10-03.7' }, { version: '2026-10-04.2' }], now) !== '2026-10-04.3') problems.push('nextVersion counts the day\'s publications');
+  if (p.invalidBundleItems(offerings, bundleItems).map((x) => x.item.id).join() !== 'b4') problems.push('invalidBundleItems should flag exactly the AR-as-bundle item');
+
+  // The PublicPricingV1 schema accepts the document and rejects leaks / malformed data.
+  const bad = (mutate) => {
+    const copy = structuredClone(pub);
+    mutate(copy);
+    return p.PublicPricingV1.safeParse(copy).success;
+  };
+  if (!p.PublicPricingV1.safeParse(pub).success) problems.push(`PublicPricingV1 rejects the published document: ${p.PublicPricingV1.safeParse(pub).issues?.join('; ')}`);
+  const REJECTED = {
+    'an unexpected key (a leak)': (d) => { d.offerings[0].pricePoints[0].setupFeeEur = 1; },
+    'a bad publishedAt': (d) => { d.publishedAt = '2026-10-04'; },
+    'a non-string version': (d) => { d.version = 1; },
+    'an unknown strategyType': (d) => { d.offerings[0].strategyType = 'FREE'; },
+    'an unknown displayFormat': (d) => { d.offerings[0].displayFormat = 'SHOW_FROM_PRICE'; },
+    'an unknown tier': (d) => { d.offerings[0].pricePoints[0].tier = 'GOLD'; },
+    'a string fee': (d) => { d.offerings[0].pricePoints[0].annualFeeEur = '950'; },
+    'an on-request price point with an amount': (d) => { d.offerings[0].pricePoints[3].annualFeeEur = 1; },
+    'a priced point flagged on request': (d) => { d.offerings[0].pricePoints[0].isOnRequest = true; },
+    'a non-boolean fromPrefix': (d) => { d.offerings[0].fromPrefix = 'true'; },
+    'features that are not strings': (d) => { d.offerings[0].features = [1]; },
+    'a bundleOf that names an unpublished offering': (d) => { d.offerings.find((o) => o.offeringCode === 'AR_DPP_BUNDLE').bundleOf.push('NOPE'); },
+    'bundleOf on a non-bundle': (d) => { d.offerings[0].bundleOf = ['AR']; },
+    'a duplicate offeringCode': (d) => { d.offerings[1].offeringCode = d.offerings[0].offeringCode; },
+    'a missing offerings array': (d) => { delete d.offerings; },
+  };
+  for (const [what, mutate] of Object.entries(REJECTED)) if (bad(mutate)) problems.push(`PublicPricingV1 accepted ${what}`);
+  if (p.PublicPricingV1.safeParse(null).success || p.PublicPricingV1.safeParse([]).success) problems.push('PublicPricingV1 accepted a non-object');
 
   // Display copy.
-  const priced = (displayMode) => ({ displayMode, items: [{ annualFeeEur: 2500, isOnRequest: false }, { annualFeeEur: 950, isOnRequest: false }, { annualFeeEur: null, isOnRequest: true }] });
+  const priced = (displayFormat, fromPrefix = false) => ({ displayFormat, fromPrefix, pricePoints: [{ annualFeeEur: 2500, isOnRequest: false }, { annualFeeEur: 950, isOnRequest: false }, { annualFeeEur: null, isOnRequest: true }] });
   const copy = [
-    [p.strategyHeadline(priced('SHOW_FROM_PRICE')), 'from €950'],
-    [p.strategyHeadline(priced('SHOW_EXACT_TOTAL')), '€3,450/yr'],
-    [p.strategyHeadline(priced('SHOW_PER_OPTION')), null],
-    [p.strategyHeadline(priced('HIDE')), 'On request'],
-    [p.strategyHeadline({ displayMode: 'SHOW_FROM_PRICE', items: [] }), 'On request'],
-    [p.itemPriceLabel({ annualFeeEur: 1020, isOnRequest: false }), '€1,020/yr'],
-    [p.itemPriceLabel({ annualFeeEur: 99.5, isOnRequest: false }), '€99.50/yr'],
-    [p.itemPriceLabel({ annualFeeEur: null, isOnRequest: true }), 'On request'],
+    [p.offeringHeadline(priced('ADD_ON_LIST', true)), 'from €950/yr'],
+    [p.offeringHeadline(priced('PRICE_CARD')), '€3,450/yr'],
+    [p.offeringHeadline(priced('PRICE_CARD', true)), 'from €950/yr'],
+    [p.offeringHeadline(priced('TIER_TABLE')), null],
+    [p.offeringHeadline(priced('BUNDLE_COMPARISON')), null],
+    [p.offeringHeadline(priced('SEAT_PRICING')), null],
+    [p.offeringHeadline(priced('CONTACT_CTA')), 'On request'],
+    [p.offeringHeadline(priced('HIDDEN')), 'On request'],
+    [p.offeringHeadline({ displayFormat: 'ADD_ON_LIST', fromPrefix: true, pricePoints: [] }), 'On request'],
+    [p.pricePointLabel({ annualFeeEur: 1020, isOnRequest: false }, 'BUNDLE'), '€1,020/yr'],
+    [p.pricePointLabel({ annualFeeEur: 99.5, isOnRequest: false }, 'TIERED'), '€99.50/yr'],
+    [p.pricePointLabel({ annualFeeEur: 150, isOnRequest: false }, 'PER_SEAT'), '€150/seat'],
+    [p.pricePointLabel({ annualFeeEur: null, isOnRequest: true }, 'TIERED'), 'On request'],
   ];
   for (const [got, want] of copy) if (got !== want) problems.push(`display copy "${got}", want "${want}"`);
 
   if (problems.length) fail(`C1 pricing: ${problems.join('; ')}`);
-  else ok(`C1 pricing: D3 rules for ${types.length} strategy types; ${seed.length}×${tiers.length} seed items (Boss on request, Bundle −${p.BUNDLE_DISCOUNT * 100}%); pricing.json filters live/public/on-request; ${copy.length} display-copy cases`);
+  else ok(`C1 pricing: ${Object.keys(PLAN_FIELDS).length} objects + views/layout/nav match the plan; D3 format/from-prefix/hidden rules for ${types.length} strategy types; ${seed.length} seed offerings, ${allPoints.length} price points (Bundle −${p.BUNDLE_DISCOUNT * 100}%), ${p.BUNDLE_ITEMS.length} bundle items; pricing.json filters live/legacy/on-request, schema rejects ${Object.keys(REJECTED).length} malformed cases; ${copy.length} display-copy cases`);
 }
 
 // ------------------------------------------------------- 13. E2 reply templates
@@ -723,45 +861,52 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 {
   const problems = [];
   const s = await import(pathToFileURL(join(ROOT, 'shared/stripe-sync.mjs')).href);
-  const p = await import(pathToFileURL(join(ROOT, 'shared/pricing.mjs')).href);
+  const p = await import(pathToFileURL(join(ROOT, 'shared/public-pricing.mjs')).href);
   const today = '2026-06-01';
 
-  // The seed as the CRM would return it: strategies with ids, items pointing at them.
-  const strategies = p.PRICING_STRATEGIES.map(({ items, ...st }, i) => ({ ...st, id: `strategy-${i}` }));
-  const items = p.PRICING_STRATEGIES.flatMap((st, i) => st.items.map((it) => ({ ...it, strategyId: `strategy-${i}` })));
-  const plan = s.planSync(strategies, items, {}, today);
-  if (plan.products.length !== 3 || plan.products.some((x) => !x.active)) problems.push('want three active products from the seed');
-  if (plan.prices.length !== 9 || plan.skipped.length !== 3) problems.push(`seed → ${plan.prices.length} prices, ${plan.skipped.length} skipped; want 9 and 3 (the Boss rows)`);
-  if (plan.skipped.some((x) => x.reason !== 'on_request')) problems.push('skipped rows must all be on_request');
+  // The seed as the CRM would return it: offerings with ids, price points pointing at them.
+  const offerings = p.OFFERINGS.map(({ pricePoints, ...o }, i) => ({ ...o, id: `offering-${i}` }));
+  const points = p.OFFERINGS.flatMap((o, i) => o.pricePoints.map((x) => ({ ...x, offeringId: `offering-${i}` })));
+  const idx = (code) => p.OFFERINGS.findIndex((o) => o.offeringCode === code);
+  const plan = s.planSync(offerings, points, {}, today);
+  if (plan.products.length !== 8 || plan.products.filter((x) => !x.active).map((x) => x.id).join() !== 'BOSS') problems.push('want eight products from the seed, only BOSS (quote-only) inactive');
+  if (plan.prices.length !== 11) problems.push(`seed → ${plan.prices.length} prices; want 11 (DPP 3, AR 3, bundle 3, EPREL, Battery Passport)`);
+  const reasons = Object.fromEntries(['on_request', 'offering_hidden', 'per_seat_not_synced'].map((r) => [r, plan.skipped.filter((x) => x.reason === r).length]));
+  if (plan.skipped.length !== 6 || reasons.on_request !== 3 || reasons.offering_hidden !== 1 || reasons.per_seat_not_synced !== 2) problems.push(`seed skipped ${JSON.stringify(plan.skipped)}; want 3 Boss rows on_request, the Boss offering hidden, 2 per-seat`);
   const beginner = plan.prices.find((x) => x.lookupKey === 'dpp-beginner-2026');
-  if (!beginner || beginner.unitAmount !== 95000 || beginner.currency !== 'eur' || beginner.interval !== 'year' || beginner.productId !== 'dsp-2026') {
-    problems.push(`dpp-beginner-2026 → ${JSON.stringify(beginner)}; want 95000 eur/year on product dsp-2026`);
+  if (!beginner || beginner.unitAmount !== 95000 || beginner.currency !== 'eur' || beginner.interval !== 'year' || beginner.productId !== 'DPP_SUBSCRIPTION') {
+    problems.push(`dpp-beginner-2026 → ${JSON.stringify(beginner)}; want 95000 eur/year on product DPP_SUBSCRIPTION`);
   }
-  if (beginner?.metadata.tier !== 'BEGINNER' || beginner?.metadata.displayMode !== 'SHOW_PER_OPTION' || 'highlighted' in (beginner?.metadata ?? {})) {
-    problems.push('price metadata: tier and D3 displayMode set, highlighted only when highlighted');
+  if (beginner?.metadata.tier !== 'BEGINNER' || beginner?.metadata.displayFormat !== 'TIER_TABLE' || beginner?.metadata.offeringCode !== 'DPP_SUBSCRIPTION' || 'highlighted' in (beginner?.metadata ?? {})) {
+    problems.push('price metadata: tier, offeringCode and D3 displayFormat set, highlighted only when highlighted');
   }
+  if (plan.prices.find((x) => x.lookupKey === 'eprel-registration-2026')?.unitAmount !== 50000) problems.push('EPREL registration → 50000 cents');
   if (s.toCents(19.99) !== 1999 || s.toCents(1020) !== 102000) problems.push('toCents rounds to whole cents');
 
-  // Highlighted, on-request, hidden and inactive.
-  const highlighted = items.map((it) => (it.correlationId === 'ar-boost-2026' ? { ...it, isHighlighted: true } : it));
-  if (s.planSync(strategies, highlighted, {}, today).prices.find((x) => x.lookupKey === 'ar-boost-2026')?.metadata.highlighted !== 'true') problems.push('isHighlighted → metadata.highlighted "true"');
-  const hidden = strategies.map((st) => (st.id === 'strategy-1' ? { ...st, displayMode: 'HIDE' } : st));
-  const hiddenPlan = s.planSync(hidden, items, {}, today);
-  if (hiddenPlan.products.find((x) => x.id === 'ar-2026')?.active !== false) problems.push('HIDE strategy → product active false');
-  if (hiddenPlan.prices.some((x) => x.productId === 'ar-2026') || hiddenPlan.skipped.filter((x) => x.reason === 'strategy_hidden').length !== 4) problems.push('HIDE strategy → none of its items gets a price');
-  const expired = strategies.map((st) => (st.id === 'strategy-2' ? { ...st, isActive: false } : st));
-  if (s.planSync(expired, items, {}, today).products.length !== 2) problems.push('no filter syncs live strategies only');
-  if (s.planSync(expired, items, { strategyId: 'strategy-2' }, today).products[0]?.active !== false) problems.push('an inactive strategy asked for by id → inactive product');
+  // Highlighted, on-request, legacy, hidden and inactive.
+  const highlighted = points.map((it) => (it.correlationId === 'ar-boost-2026' ? { ...it, isHighlighted: true } : it));
+  if (s.planSync(offerings, highlighted, {}, today).prices.find((x) => x.lookupKey === 'ar-boost-2026')?.metadata.highlighted !== 'true') problems.push('isHighlighted → metadata.highlighted "true"');
+  const legacy = points.map((it) => (it.correlationId === 'ar-boost-2026' ? { ...it, isLegacy: true } : it));
+  const legacyPlan = s.planSync(offerings, legacy, {}, today);
+  if (legacyPlan.prices.some((x) => x.lookupKey === 'ar-boost-2026') || !legacyPlan.skipped.some((x) => x.correlationId === 'ar-boost-2026' && x.reason === 'legacy')) problems.push('an isLegacy price point gets no price');
+  const hidden = offerings.map((o) => (o.offeringCode === 'AR' ? { ...o, displayFormat: 'CONTACT_CTA' } : o));
+  const hiddenPlan = s.planSync(hidden, points, {}, today);
+  if (hiddenPlan.products.find((x) => x.id === 'AR')?.active !== false) problems.push('CONTACT_CTA offering → product active false');
+  if (hiddenPlan.prices.some((x) => x.productId === 'AR') || hiddenPlan.skipped.filter((x) => x.reason === 'offering_hidden').length !== 5) problems.push('CONTACT_CTA offering → none of its price points gets a price');
+  const bundleIdx = idx('AR_DPP_BUNDLE');
+  const expired = offerings.map((o) => (o.id === `offering-${bundleIdx}` ? { ...o, isActive: false } : o));
+  if (s.planSync(expired, points, {}, today).products.length !== 7) problems.push('no filter syncs live offerings only');
+  if (s.planSync(expired, points, { offeringId: `offering-${bundleIdx}` }, today).products[0]?.active !== false) problems.push('an inactive offering asked for by id → inactive product');
 
   // Filters.
-  const one = s.planSync(strategies, items, { correlationIds: ['ar-builder-2026'] }, today);
-  if (one.products.length !== 1 || one.prices.length !== 1 || one.prices[0].lookupKey !== 'ar-builder-2026') problems.push('an item correlationId syncs that item only');
-  const whole = s.planSync(strategies, items, { correlationIds: ['ar-2026'] }, today);
-  if (whole.products.length !== 1 || whole.prices.length !== 3) problems.push('a strategy correlationId syncs the strategy and its priced items');
-  if (s.planSync(strategies, items, { strategyId: 'strategy-0' }, today).products[0].id !== 'dsp-2026') problems.push('strategyId filter');
+  const one = s.planSync(offerings, points, { correlationIds: ['ar-builder-2026'] }, today);
+  if (one.products.length !== 1 || one.prices.length !== 1 || one.prices[0].lookupKey !== 'ar-builder-2026') problems.push('a price point correlationId syncs that point only');
+  const whole = s.planSync(offerings, points, { correlationIds: ['AR'] }, today);
+  if (whole.products.length !== 1 || whole.prices.length !== 3) problems.push('an offeringCode syncs the offering and its priced points');
+  if (s.planSync(offerings, points, { offeringId: `offering-${idx('DPP_SUBSCRIPTION')}` }, today).products[0].id !== 'DPP_SUBSCRIPTION') problems.push('offeringId filter');
 
   // Idempotency: the same input plans the same state, and a matching Stripe needs no write.
-  if (JSON.stringify(s.planSync(strategies, items, {}, today)) !== JSON.stringify(plan)) problems.push('planSync is not deterministic');
+  if (JSON.stringify(s.planSync(offerings, points, {}, today)) !== JSON.stringify(plan)) problems.push('planSync is not deterministic');
   if (Object.keys(s.metadataPatch(beginner.metadata, { ...beginner.metadata }, s.PRICE_METADATA_KEYS)).length) problems.push('metadataPatch of identical metadata must be empty');
   const unset = s.metadataPatch({ correlationId: 'x' }, { correlationId: 'x', highlighted: 'true', other: 'kept' }, s.PRICE_METADATA_KEYS);
   if (JSON.stringify(unset) !== '{"highlighted":""}') problems.push(`metadataPatch should unset only a managed key that stopped applying, got ${JSON.stringify(unset)}`);
@@ -791,7 +936,7 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
   }
 
   if (problems.length) fail(`C2 Stripe sync: ${problems.join('; ')}`);
-  else ok(`C2 Stripe sync: seed → ${plan.products.length} products, ${plan.prices.length} prices (EUR cents, yearly), ${plan.skipped.length} on request skipped; HIDE/inactive/highlight/filter cases; idempotent plan + metadata patch; webhook signature accepts only a valid, fresh one`);
+  else ok(`C2 Stripe sync: seed → ${plan.products.length} products, ${plan.prices.length} prices (EUR cents, yearly), ${plan.skipped.length} skipped (on request, legacy, per-seat, hidden); hidden/inactive/legacy/highlight/filter cases; idempotent plan + metadata patch; webhook signature accepts only a valid, fresh one`);
 }
 
 // ----------------------------------------------------------- 18. C3 portal sync

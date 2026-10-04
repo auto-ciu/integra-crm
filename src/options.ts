@@ -8,7 +8,7 @@
  */
 import { options, type TagColor } from './lib/fields';
 import { OPPORTUNITY_STAGES } from '../shared/stages.mjs';
-import { CURRENCIES, DISPLAY_MODES, PRICE_PRODUCT_LINES, STRATEGY_TYPES } from '../shared/pricing.mjs';
+import { CURRENCIES, DISPLAY_FORMATS, STRATEGY_TYPES } from '../shared/public-pricing.mjs';
 import { CUSTOMER_EVENT_SOURCES, CUSTOMER_EVENT_TYPES } from '../shared/portal-events.mjs';
 import { RESEARCH_DEPTHS, RESEARCH_STATUSES } from '../shared/research-prompts.mjs';
 
@@ -248,14 +248,12 @@ export const FOLLOW_UP_STATUS = options([
 
 // ------------------------------------------------------- C1 pricing engine
 
-/** shared/pricing.mjs rows → option list (the .mjs colours are plain strings). */
+/** shared/public-pricing.mjs rows → option list (the .mjs colours are plain strings). */
 const fromShared = (rows: Array<{ value: string; label: string; color: string }>) =>
   options(rows.map((r): [string, string, TagColor] => [r.value, r.label, r.color as TagColor]));
 
 export const PRICING_STRATEGY_TYPE = fromShared(STRATEGY_TYPES);
-export const PRICING_DISPLAY_MODE = fromShared(DISPLAY_MODES);
-/** PRODUCT_LINE plus OTHER, for price items that belong to no product line. */
-export const PRICE_PRODUCT_LINE = fromShared(PRICE_PRODUCT_LINES);
+export const PRICING_DISPLAY_FORMAT = fromShared(DISPLAY_FORMATS);
 export const PRICE_CURRENCY = fromShared(CURRENCIES);
 
 /** Re-exported so views can import stages from the same module as the rest. */
