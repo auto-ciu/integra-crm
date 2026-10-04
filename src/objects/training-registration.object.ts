@@ -7,7 +7,7 @@
  * give the record a readable label identifier.
  */
 import { defineObject } from '../lib/sdk';
-import { boolean, dateTime, link, manyToOne, select, text } from '../lib/fields';
+import { boolean, dateTime, link, manyToOne, oneToMany, select, text } from '../lib/fields';
 import { IDS } from '../ids';
 import { STANDARD } from '../standard-ids';
 import { TRAINING_REGISTRATION_STATUS } from '../options';
@@ -97,6 +97,15 @@ export default defineObject({
       name: 'certificateUrl',
       label: 'Certificate · 证书',
       icon: 'IconLink',
+    }),
+    oneToMany({
+      universalIdentifier: F.opportunityLines,
+      name: 'opportunityLines',
+      label: 'Opportunity lines · 商机明细',
+      icon: 'IconListDetails',
+      description: 'Pipeline lines pricing this training seat',
+      targetObjectId: IDS.opportunityLine.object,
+      inverseFieldId: IDS.opportunityLine.fields.trainingRegistration,
     }),
   ],
 });

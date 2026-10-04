@@ -6,6 +6,11 @@
  * `stage` should be one of the line's own stream's stages; a relation cannot
  * express that, so the stage picker is unfiltered in the schema and
  * verify-model / the seed keep stages per stream.
+ *
+ * C2 price linkage: `arMandate` ties a line to the AR mandate it prices
+ * (src/functions/link-mandate-pricing.ts creates / updates these from the
+ * mandate's products), and a training line points at the `trainingRegistration`
+ * (the seat) it sells. ops/build-quote.mjs quotes an opportunity from its lines.
  */
 import { defineObject } from '../lib/sdk';
 import { boolean, date, manyToOne, number, richText, text } from '../lib/fields';
@@ -95,6 +100,24 @@ export default defineObject({
       label: 'Active · 启用',
       icon: 'IconToggleRight',
       defaultValue: true,
+    }),
+    manyToOne({
+      universalIdentifier: F.arMandate,
+      name: 'arMandate',
+      label: 'AR mandate · 授权委托',
+      icon: 'IconFileCertificate',
+      description: 'The mandate this line prices (set by link-mandate-pricing)',
+      targetObjectId: IDS.arMandate.object,
+      inverseFieldId: IDS.arMandate.fields.opportunityLines,
+    }),
+    manyToOne({
+      universalIdentifier: F.trainingRegistration,
+      name: 'trainingRegistration',
+      label: 'Training registration · 培训报名',
+      icon: 'IconTicket',
+      description: 'For a training line: the seat it sells',
+      targetObjectId: IDS.trainingRegistration.object,
+      inverseFieldId: IDS.trainingRegistration.fields.opportunityLines,
     }),
   ],
 });

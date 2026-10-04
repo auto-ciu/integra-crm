@@ -11,7 +11,7 @@
  * for existing customers but are never published.
  */
 import { defineObject } from '../lib/sdk';
-import { boolean, manyToOne, number, select, text, uniqueText } from '../lib/fields';
+import { boolean, manyToOne, number, oneToMany, select, text, uniqueText } from '../lib/fields';
 import { IDS } from '../ids';
 import { PRICE_CURRENCY, TIER } from '../options';
 
@@ -108,6 +108,15 @@ export default defineObject({
       name: 'description',
       label: 'Description · 描述',
       icon: 'IconFileText',
+    }),
+    oneToMany({
+      universalIdentifier: F.agreementLines,
+      name: 'agreementLines',
+      label: 'Agreement lines · 协议明细',
+      icon: 'IconFileDollar',
+      description: 'Client price agreement lines at this price point',
+      targetObjectId: IDS.agreementLine.object,
+      inverseFieldId: IDS.agreementLine.fields.pricePoint,
     }),
   ],
 });

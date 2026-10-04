@@ -58,6 +58,15 @@ async function request(config, method, path, body) {
   return json;
 }
 
+/** One page of records (no pagination) — for lookups that expect 0–few hits. */
+export async function findRecords(config, namePlural, { filter, orderBy, limit = 20 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (filter) params.set('filter', filter);
+  if (orderBy) params.set('order_by', orderBy);
+  const page = await request(config, 'GET', `/rest/${namePlural}?${params}`);
+  return page?.data?.[namePlural] ?? [];
+}
+
 /** GET every record of an object, following Twenty's cursor pagination. */
 export async function findAllRecords(config, namePlural, { filter, orderBy, pageSize = 200 } = {}) {
   const records = [];
@@ -104,6 +113,12 @@ export async function metadataGraphql(config, query, variables = {}) {
   }
   return result?.data;
 }
+
+/**
+ * A REST filter literal: `field[eq]:"value"`. The value is JSON-quoted so a
+ * stray quote or backslash can't break out of the filter expression.
+ */
+export const eq = (field, value) => `${field}[eq]:${JSON.stringify(value)}`;
 
 /** Tiny CLI flag parser: `--dry-run`, `--today=2026-09-18`. */
 export function parseArgs(argv) {

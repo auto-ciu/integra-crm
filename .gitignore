@@ -2,3 +2,4 @@ node_modules/
 dist/
 .twenty/
 pricing.json
+pricing.preview.*.json

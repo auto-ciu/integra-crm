@@ -15,6 +15,7 @@ export const IDS = {
   applicationVariables: {
     sidecarUrl: 'bb4f84fe-1f4f-4655-83d8-b0498e6e48ad',
     registrationToken: 'b3cb7d1c-83ad-464c-a2e9-44dba968df49',
+    discountCheckToken: '0e2d106d-a501-4777-ac2a-2bf9a49803b7',
   },
 
   company: {
@@ -36,6 +37,8 @@ export const IDS = {
       fairLeads: '9e48010c-03a2-41b2-ae5b-f6495207294e',
       /** inverse of trainingRegistration.company */
       trainingRegistrations: '310c403f-499f-4228-9acd-57cf73e3351b',
+      /** inverse of clientPriceAgreement.client */
+      clientPriceAgreements: 'c5f23cf7-a362-4ef0-9323-891dfbacf981',
     },
   },
 
@@ -56,6 +59,10 @@ export const IDS = {
       streamContacts: '2e1800e4-f142-46a7-9f1b-46ef4f191408',
       /** inverse of trainingRegistration.person */
       trainingRegistrations: 'ffd839c7-84c1-4870-8462-28f7d3d5d6c0',
+      /** inverse of clientPriceAgreement.contact */
+      clientPriceAgreements: '16755901-9d4d-4166-a888-e0d9210e7347',
+      /** inverse of clientPriceAgreement.signedBy */
+      signedClientPriceAgreements: '67b32f9e-f24c-485b-a846-65753dbf72a0',
     },
   },
 
@@ -69,6 +76,8 @@ export const IDS = {
       enquiries: 'dbd1e3a1-0d87-4975-8b76-95bbae85c67d',
       /** Fair the opportunity came from (B1; free text until F0.5's leadSource select) */
       leadSource: '51894b4e-22fd-4cd0-888f-cafb56103b71',
+      /** inverse of clientPriceAgreement.opportunity */
+      clientPriceAgreements: '87f89d0c-a4c9-46cb-9956-cc2f18198b79',
     },
   },
 
@@ -86,6 +95,10 @@ export const IDS = {
       subscribedResearchBrief: 'c533940b-d4c6-46ca-962e-e4bf3a577cee',
       /** inverse of researchFinding.suggestedOwner */
       suggestedResearchFindings: 'fa71e082-d7b8-4e6b-8634-81ca03e41137',
+      /** inverse of clientPriceAgreement.preparedBy */
+      preparedClientPriceAgreements: 'd9126154-fbd1-43e0-93f6-1865a0a2444b',
+      /** inverse of discountRule.approver */
+      discountRulesToApprove: '0238c9df-cf34-448b-ad91-b194ffe6ac88',
     },
   },
 
@@ -105,6 +118,8 @@ export const IDS = {
       documents: 'a4b5c6d7-000d-4a8b-b6c1-d2e3f4051627',
       /** inverse of mandateProduct.arMandate */
       products: 'a4b5c6d7-000e-4b8c-87d2-e3f405162738',
+      /** inverse of opportunityLine.arMandate */
+      opportunityLines: 'b2499a2e-1574-4b42-b1f0-34c0b9cf2a1b',
     },
   },
 
@@ -252,6 +267,10 @@ export const IDS = {
       expectedCloseDate: '827ed4e0-c57a-4b5c-8027-05d1f5dfe6e9',
       notes: '3aea1299-c58c-4db9-bb72-586ec9638fa9',
       isActive: 'be1fc1ce-bce6-4c7f-b9ab-369cb28bf843',
+      /** C2: the AR mandate this line prices */
+      arMandate: '8f1b00fe-7181-472a-aed6-79e6a91a08a5',
+      /** C2: the training seat this line prices */
+      trainingRegistration: '43020c41-322d-4fa1-ba90-d768b6f9cac4',
     },
   },
 
@@ -339,6 +358,10 @@ export const IDS = {
       componentOf: '16572dd0-07d5-4b22-9215-f3c04bf7340f',
       /** inverse of competitorPriceObservation.offering */
       competitorObservations: '5fe48e48-8551-4392-963d-7503c7f23827',
+      /** inverse of agreementLine.offering */
+      agreementLines: '92c8a1b5-c6a7-4002-9e71-498228665540',
+      /** inverse of discountRule.offering */
+      discountRules: '8c69839b-f578-4d6d-a5d4-7d6c168ec1d1',
     },
   },
 
@@ -357,6 +380,8 @@ export const IDS = {
       isLegacy: 'b71ed52f-713c-4f91-9bde-61f7a7058033',
       sortOrder: '6b5c1e2a-2b22-4079-b362-bf0d1fcc6a59',
       description: '230d1a5e-3906-4729-8aa6-59cd938ca4b6',
+      /** inverse of agreementLine.pricePoint */
+      agreementLines: '7abb650d-03ed-4f55-8af8-a45247cc4f1a',
     },
   },
 
@@ -503,6 +528,8 @@ export const IDS = {
       dietaryRequirements: 'd07ceda4-3937-4617-84c2-b9a4d6c1aca2',
       certificateIssued: '7c15d680-7657-49f8-8cbb-a92747a98816',
       certificateUrl: '3566fe9a-9841-4482-9da6-eb52443af2ee',
+      /** inverse of opportunityLine.trainingRegistration */
+      opportunityLines: '55aab7f9-7b83-4e20-ba82-ed7174e5569e',
     },
   },
 
@@ -617,6 +644,57 @@ export const IDS = {
       observedAt: '77a64c50-f333-4d15-b445-c003509148ef',
       sourceUrl: '64db9fa7-3ad8-4609-b8e9-f8063331aa20',
       notes: 'f136735d-e624-443d-bfe1-0643092360b9',
+    },
+  },
+
+  // ------------------------------------------- C2 client price agreements
+
+  clientPriceAgreement: {
+    object: '6a2d6799-166a-4505-8d15-fef8ad405d88',
+    fields: {
+      name: 'b1f412cc-5442-45d9-8eda-7e99a170c375',
+      agreementCode: 'b5c5c271-60bf-4f33-8956-b72dbb0bf2aa',
+      client: 'ff8892f4-581d-40c7-9744-3c722368d2ac',
+      contact: 'f5da0aed-61bb-4cb9-90d8-1c108a011109',
+      opportunity: 'ae133ff8-1adb-4f87-9063-4cf5baec2a4d',
+      status: 'b39c727b-062a-43f7-ae10-2a0497432c10',
+      agreementType: 'bc0bfd53-0031-4962-8895-480267ef7844',
+      startDate: '24c29d6b-6c70-48de-9018-f602584c82e0',
+      endDate: 'a0ac0f3c-bfe1-4600-a3f0-1dc24b01c15d',
+      signedAt: '57a1f297-f9f6-4828-903c-9ace9be612dd',
+      signedBy: 'ec30a902-bd71-46b6-b7a4-cb947b84aa90',
+      preparedBy: 'c5ce36d3-7d6c-4b03-90ca-c0fe3326d8b2',
+      notes: '432c76e4-ee5a-4026-886e-a97874233386',
+      /** inverse of agreementLine.agreement */
+      lines: 'aae9788a-11be-4528-b4d6-ea4234e99ee1',
+    },
+  },
+
+  agreementLine: {
+    object: '2828d582-b581-4d2d-b043-a09f54cf5599',
+    fields: {
+      name: 'b34cdc41-9ca2-4e3a-b4be-6ec2ffb44cd2',
+      agreement: '269d753e-1b17-45d5-8aea-359dc4127d21',
+      offering: 'b1c54892-129c-4fd4-97db-3e352a1290c9',
+      pricePoint: '794a3ee8-536b-4f87-915c-018c5a725125',
+      agreedPriceEur: '8e166325-d414-4ced-8a18-2b7208ff176e',
+      discountPercent: '542d2529-4244-49b8-946a-8e0665842212',
+      discountRationale: 'bf37771c-f9dd-436a-a895-932f53722e02',
+      quantity: '570755eb-07ef-440b-9860-eaea6889f55a',
+      effectiveFrom: '533b03ce-f912-4140-9f07-17d837cef171',
+      effectiveUntil: 'e00bddc5-ce30-4499-9f78-1b59c3315a72',
+    },
+  },
+
+  discountRule: {
+    object: '04b974dd-b69a-4d7e-815e-ea36ab8a9512',
+    fields: {
+      name: 'd4602093-55af-4765-9455-fd847b59bb6e',
+      offering: '94cda8c5-0a84-41f2-9d95-aa99ab61238d',
+      maxDiscountPercent: 'e7f8478f-b077-4d5d-8578-6238cd9ddf0e',
+      approver: '80290048-93a7-4f49-8e8d-4430cb9b0016',
+      minAgreementValueEur: 'fe02f4f9-235a-47d8-9c06-44f76bdea707',
+      isActive: 'b0e168fb-9c0e-4038-9c65-ab68524e1beb',
     },
   },
 
@@ -1082,6 +1160,75 @@ export const IDS = {
         '863cc67a-1ecf-493c-ad86-45e6dcc30c52',
       ],
     },
+    clientPriceAgreementsTable: {
+      view: '119b8bd3-d097-48c5-9bd2-b8bb7a98dad3',
+      fields: [
+        '29b2403f-9974-4e27-8f03-b74b9f9901de',
+        '63a49a05-ca39-4caf-8ddc-79bb3870cc43',
+        '273389af-3ca0-4d9e-aeb8-bc3e76d1a3d6',
+        '5a1695d0-1332-4620-9324-4441ff686d24',
+        'e620dc5a-8f3d-4561-a280-0268e5aa186e',
+        'da1045c7-6fec-4004-830e-352781f1a7c9',
+      ],
+      sort: '188303fe-01eb-4b75-9188-9db5bc9d04c4',
+    },
+    agreementLinesTable: {
+      view: '15e0a5ff-785e-48a6-9acd-725da4ccbba8',
+      fields: [
+        'db4461d6-a60e-44c8-ad30-946d701e909a',
+        '01933750-0a5a-4824-a753-ddbf09f96ad2',
+        '0c466a4e-4f68-43d4-aeb9-a11bb9fc49c9',
+        'ab77a8c4-dd3d-4a89-88d1-00dca0856e1e',
+        '72ad315f-90d3-421c-bd37-d42736514d28',
+        '451a0d45-9a67-4adc-a1b5-405e42eb4952',
+        'cccbe5cc-f93f-4300-897e-72fcf9283f4b',
+      ],
+      sort: '6b6b9918-52d8-4917-b5c3-ae927b7620e0',
+    },
+    discountRulesTable: {
+      view: 'e45adf9c-b008-41fa-8b35-99a7478e4bdb',
+      fields: [
+        '8fbb61a4-bc1f-4d4e-a940-c0006a233b40',
+        'a62d06f7-1461-4689-accc-4acce6a745e9',
+        '93be72b4-95dc-45ff-a6e6-8bb772ac0957',
+        'edcaf014-8815-481b-9b16-e10d7e5b7335',
+        '97e712a2-0d3d-4399-af51-eaf63d3f7c41',
+        '20e5ebc3-7f39-4dfd-8875-9a73755a9b8a',
+      ],
+      sort: '81f6b5ab-62bf-446b-a8d5-fd024b30e268',
+    },
+    clientPriceAgreementOverviewFields: {
+      view: 'c015c119-c417-4b2c-a349-0b5518e7e51f',
+      fields: [
+        'ef2a966a-b934-4524-ab8d-7d9fac164e3f',
+        '8f695741-3320-4853-861e-74d47a5c66b0',
+        '3bc74d34-ab91-4dcb-ae3e-407ce9b4f0a4',
+        '5f8e7b6c-bf4c-4b35-aacd-cd8659f8a5c9',
+        '3dcf69a2-0887-4267-b946-a099d08d6b2e',
+        '723a2ca7-1ed9-447e-87cc-0d6dd52b8004',
+        'd03404c0-dd23-4549-b23d-0ceb6b0d3574',
+        '6d76e849-93e7-4d21-8d5f-97780d3ffaab',
+        '084f432f-162e-41c7-ac8f-367ce15c1108',
+        '58ffa614-9218-43db-875f-88265be09d0d',
+        '22cc9779-2183-49ae-ac7c-d03621856cd7',
+        'b36e3a68-7783-4502-9f90-e76d2e68f290',
+        '8f87b5bf-fac2-4691-b9dc-174f0b8e5547',
+      ],
+    },
+    clientPriceAgreementLinesWidget: {
+      view: 'a90149f1-b063-4169-9323-f7ae62da4f62',
+      fields: [
+        '43add0c4-e8e1-4e97-af52-bc5a373ae6e1',
+        '1fc9f329-f625-492f-bb4e-c73136e37303',
+        '849671d8-cb93-456e-b2a5-72d35ba5a0f1',
+        '522d68e5-0201-4f35-929d-cfc58c5b6134',
+        'e7731ae7-7b55-4df5-8fa8-69e687836959',
+        '68bd535d-43d5-4f31-b9b0-d48e7c3fa4b0',
+        'b477bdba-4eb4-4204-ba3c-f71d1c7630a8',
+        'e72b8da1-5b94-4a8f-93ed-3c20b95f6e19',
+      ],
+      sort: 'e1eeaaa2-8c35-497a-8321-6633b5ba06ab',
+    },
   },
 
   frontComponents: {
@@ -1091,6 +1238,7 @@ export const IDS = {
     promoteToLeadButton: 'd736dec8-98e6-4e3f-9798-8983c93d700c',
     pricingDisplay: 'c62acce9-9a0d-441b-a6d7-46604fc14f0a',
     registerForTrainingButton: '453e813e-efe6-4f54-91ae-d83592da0768',
+    validateDiscountsButton: 'bac60b1d-aa63-4d85-be99-e963651539b3',
   },
 
   pageLayouts: {
@@ -1200,6 +1348,19 @@ export const IDS = {
         rawResult: '35ab25e2-d9d6-429e-8d90-4c6a545c1020',
       },
     },
+    clientPriceAgreementRecord: {
+      layout: 'c96c663a-1695-4572-a1ee-f73fb676e23b',
+      tabs: {
+        overview: 'ecacaac9-1112-48af-bf62-0b2f402a785f',
+        lines: 'f71890a7-eacc-4d55-bc7b-40f9d624c1ed',
+        validation: '65c108d5-8b02-4ba5-b31c-a71b215dfcc7',
+      },
+      widgets: {
+        overviewFields: '5ed4e6fe-a1ac-4fbd-9b3c-d24d49f7c016',
+        lines: '8dce1ffa-763f-4a53-8511-e8052105f37b',
+        validateDiscounts: 'e24abc06-ed73-4313-a1a0-7dfcbd6d41e4',
+      },
+    },
   },
 
   navigation: {
@@ -1211,6 +1372,10 @@ export const IDS = {
     productStreams: '6fdbe905-ea65-4ee3-af3d-7d7d6e4b72c3',
     streamStages: '8fbdc930-2e06-4f36-876a-61ac59b343ea',
     pricing: '506d3e76-f244-41e7-a77b-7d1dce1e395f',
+    /** C2: the Pricing folder holding Offerings, Client Price Agreements, Discount Rules */
+    pricingFolder: '827ccbbc-9779-47a3-99d1-1a79bbd135b9',
+    clientPriceAgreements: '4b74007f-8f39-429d-8e91-14f49bd4a818',
+    discountRules: '7a0fff77-1e28-4e1c-9afd-49c144495c76',
     leadDiscovery: 'b85ea1d6-f8cd-460c-8491-5e66a540c065',
     portalEvents: '9c08b4b3-230b-40be-b966-d41c742efef5',
     marketResearch: '67888fed-5e50-4f6e-aaf8-f4ca4e4c3014',
