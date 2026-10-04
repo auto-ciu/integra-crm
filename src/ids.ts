@@ -25,6 +25,7 @@ export const IDS = {
       productCategory: 'c0a1f2d3-44e4-4d5e-be70-0b1c2d3e4f50',
       exportRevenueBand: 'c0a1f2d3-55e4-4e5f-8f71-1c2d3e4f5061',
       tier: 'c0a1f2d3-66e4-4f60-9072-2d3e4f506172',
+      leadSource: 'c0a1f2d3-77e4-4f61-9184-3e4f50617283',
       /** inverse of arMandate.company */
       arMandates: 'a4b5c6d7-0004-4182-ad3e-4f5a6b7c8d9e',
       /** inverse of trainingEvent.company */
@@ -46,6 +47,7 @@ export const IDS = {
       preferredChannel: '9e0d1c2b-44a3-4e4f-b071-92a3b4c5d6e7',
       lastWeChatContact: '9e0d1c2b-55a3-4f50-8172-a3b4c5d6e7f8',
       leadStatus: '9e0d1c2b-66a3-4051-9283-b4c5d6e7f809',
+      leadSource: '9e0d1c2b-77a3-4f52-9384-c5d6e7f80a10',
       /** inverse of enquiry.relatedPerson */
       enquiries: '90a3371a-5168-4b4f-8703-76bcd727386d',
       /** inverse of fairLead.person */

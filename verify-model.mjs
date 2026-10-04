@@ -861,6 +861,21 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
   else ok(`D1-D2 research: ${r.RESEARCH_TOPICS.length} prompts on PRODUCT_CATEGORY topics (OTHER has none); ${depths.length} depths, ${statuses.length} statuses; prompt builder; run-research BLOCKED without a key, B2 cost cap`);
 }
 
+// --------------------------------------------------------- 20. F0.5 leadSource
+{
+  const problems = [];
+  const objectsToCheck = ['person', 'company', 'opportunity'];
+  for (const obj of objectsToCheck) {
+    const objFiles = Object.entries(sources).filter(
+      ([f]) => f.startsWith(join(SRC, 'objects', obj) + '/') && f.endsWith('.field.ts')
+    );
+    const hasLeadSource = objFiles.some(([, text]) => /name:\s*['"]leadSource['"]/.test(text));
+    if (!hasLeadSource) problems.push(`${obj} missing leadSource field`);
+  }
+  if (problems.length) fail(`F0.5 leadSource: ${problems.join('; ')}`);
+  else ok(`F0.5 leadSource: Person, Company, and Opportunity all have leadSource field`);
+}
+
 // ----------------------------------------------------------------- report
 for (const p of passes) console.log(`✓ ${p}`);
 for (const f of failures) console.log(`✗ ${f}`);
