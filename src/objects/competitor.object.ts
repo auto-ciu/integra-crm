@@ -3,8 +3,9 @@
  * research-ingest.ts from findings.json (matched on name).
  */
 import { defineObject } from '../lib/sdk';
-import { dateTime, link, manyToOne, oneToMany, richText, text } from '../lib/fields';
+import { dateTime, link, manyToOne, number, oneToMany, richText, select, text } from '../lib/fields';
 import { IDS } from '../ids';
+import { COMPETITOR_RISK_LEVEL } from '../options';
 
 const F = IDS.competitor.fields;
 
@@ -49,6 +50,20 @@ export default defineObject({
       name: 'lastObservationAt',
       label: 'Last observation · 最近观察',
       icon: 'IconEye',
+    }),
+    // Denormalised by research-ingest.ts from the price observations (shared/competitive-intel.mjs).
+    number({
+      universalIdentifier: F.priceObservationCount,
+      name: 'priceObservationCount',
+      label: 'Price observations # · 价格观察数',
+      icon: 'IconHash',
+    }),
+    select({
+      universalIdentifier: F.riskLevel,
+      name: 'riskLevel',
+      label: 'Risk level · 风险等级',
+      icon: 'IconAlertTriangle',
+      options: COMPETITOR_RISK_LEVEL,
     }),
     oneToMany({
       universalIdentifier: F.priceObservations,

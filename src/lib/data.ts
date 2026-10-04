@@ -423,3 +423,72 @@ export async function recordOutboundReply(ticket: TicketForActions, macroName: s
     ...(ticket.status === 'CLOSED' || ticket.status === 'SPAM' ? {} : { status: 'PENDING' }),
   });
 }
+// ----------------------------------------------- B3 content / D3 competitors
+
+export type PublishedUpdateRecord = {
+  id: string;
+  name: string | null;
+  contentCategory: string | null;
+  publishedAt: string | null;
+  publishUrl: { primaryLinkUrl: string | null } | null;
+};
+
+/** Published StreamUpdates of one stream, newest first (max 100). */
+export async function fetchPublishedUpdates(streamId: string): Promise<PublishedUpdateRecord[]> {
+  const { streamUpdates } = await new CoreApiClient().query({
+    streamUpdates: {
+      __args: {
+        filter: { streamId: { eq: streamId }, isPublished: { eq: true } },
+        orderBy: [{ publishedAt: 'DescNullsLast' }],
+        first: 100,
+      },
+      edges: { node: { id: true, name: true, contentCategory: true, publishedAt: true, publishUrl: { primaryLinkUrl: true } } },
+    },
+  });
+  return ((streamUpdates?.edges ?? []) as Array<{ node: PublishedUpdateRecord }>).map((edge) => edge.node);
+}
+
+export type StreamObservationRecord = {
+  id: string;
+  competitorName: string | null;
+  competitorPriceEur: number | null;
+  currencyCode: string | null;
+  observedAt: string | null;
+  offeringName: string | null;
+};
+
+/** The 20 most recent price observations of the stream's competitors. */
+export async function fetchStreamObservations(streamId: string): Promise<StreamObservationRecord[]> {
+  const { competitors } = await new CoreApiClient().query({
+    competitors: {
+      __args: { filter: { competitorOfId: { eq: streamId } }, first: 200 },
+      edges: { node: { id: true } },
+    },
+  });
+  const ids = ((competitors?.edges ?? []) as Array<{ node: { id: string } }>).map((edge) => edge.node.id);
+  if (!ids.length) return [];
+  const { competitorPriceObservations } = await new CoreApiClient().query({
+    competitorPriceObservations: {
+      __args: { filter: { competitorId: { in: ids } }, orderBy: [{ observedAt: 'DescNullsLast' }], first: 20 },
+      edges: {
+        node: {
+          id: true,
+          competitorPriceEur: true,
+          currencyCode: true,
+          observedAt: true,
+          competitor: { name: true },
+          offering: { name: true },
+        },
+      },
+    },
+  });
+  type Node = Omit<StreamObservationRecord, 'competitorName' | 'offeringName'> & {
+    competitor: { name: string | null } | null;
+    offering: { name: string | null } | null;
+  };
+  return ((competitorPriceObservations?.edges ?? []) as Array<{ node: Node }>).map(({ node: { competitor, offering, ...o } }) => ({
+    ...o,
+    competitorName: competitor?.name ?? null,
+    offeringName: offering?.name ?? null,
+  }));
+}

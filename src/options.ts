@@ -228,6 +228,21 @@ export const STREAM_UPDATE_TYPE = options([
   ['NEWS', 'News · 新闻', 'gray'],
 ]);
 
+export const STREAM_CONTENT_CATEGORY = options([
+  ['NEWS', 'News · 新闻', 'gray'],
+  ['REGULATORY', 'Regulatory · 法规', 'blue'],
+  ['GUIDE', 'Guide · 指南', 'turquoise'],
+  ['CASE_STUDY', 'Case study · 案例', 'green'],
+  ['MARKET_REPORT', 'Market report · 市场报告', 'purple'],
+]);
+
+// HIGH first: an ascending sort on the select lists the riskiest competitors first.
+export const COMPETITOR_RISK_LEVEL = options([
+  ['HIGH', 'High · 高', 'red'],
+  ['MEDIUM', 'Medium · 中', 'orange'],
+  ['LOW', 'Low · 低', 'gray'],
+]);
+
 export const STREAM_DOCUMENT_TYPE = options([
   ['REGULATION', 'Regulation · 法规', 'blue'],
   ['GUIDANCE', 'Guidance · 指南', 'turquoise'],

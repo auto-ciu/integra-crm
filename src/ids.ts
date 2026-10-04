@@ -324,6 +324,11 @@ export const IDS = {
       updateType: 'b23c55e6-81ed-4496-aaa3-1b8478adf4ab',
       publishedAt: '3f7d2132-0625-4b2c-b1a4-de86a72b504a',
       sourceUrl: '1613d9cd-9cb8-4024-8e92-355de581af30',
+      /** B3 */
+      contentCategory: '1c6b1511-33a6-4c87-a2d2-6a1c9340cc54',
+      isPublished: 'be71c894-5785-4c13-8c7c-fab07f779410',
+      publishUrl: '43ebf076-11f2-4a8f-9bed-8ba415852f1c',
+      engagementCount: 'e4d26825-bf62-40c3-a720-574725b50964',
     },
   },
 
@@ -671,6 +676,9 @@ export const IDS = {
       lastObservationAt: '4a8ef1fc-1301-44ce-8861-42bf84dced22',
       /** inverse of competitorPriceObservation.competitor */
       priceObservations: '344c41c1-91ae-4ddc-a4f6-beb9cb4bc7cc',
+      /** D3: denormalised by research-ingest (shared/competitive-intel.mjs) */
+      priceObservationCount: '5d4f1fe6-0dc1-42e1-a464-a43c62f85a11',
+      riskLevel: '36fc24d5-a5df-42ed-aa6e-050282ec2204',
     },
   },
 
@@ -985,6 +993,38 @@ export const IDS = {
         'a33b0989-5086-4fe9-98ff-e6a7d13e83fb',
         '1d5b96d9-951f-472d-9ae8-7df02ad0cdcc',
         '7c28b39d-5f3b-47b2-a132-b7d40220ddc8',
+      ],
+    },
+    streamContentReport: {
+      view: '8fbd7c56-82ec-47be-bd42-c649dd491fef',
+      fields: [
+        '36396dcb-544f-40e8-b95d-d503534ad47c',
+        'b7150f84-d9f7-4447-908a-f7909a4dceba',
+        '0e1a861e-b71c-4d30-8498-b796a8886dcf',
+        'a0f8bbe2-6c6e-4742-8057-1d23e367a40d',
+        '38b788f3-f928-464d-8169-d900175e0a10',
+        '5d907a58-838a-4312-8f37-c87a57a6c02b',
+      ],
+      sort: '92173a29-fe86-4532-b253-dff187344033',
+    },
+    competitiveIntelDashboard: {
+      view: '44750494-facd-447e-9979-b8f44d7f214d',
+      fields: [
+        '3fe5a5ac-6c60-41e7-9e2c-35de5f9265cb',
+        '4a6d4d91-6c68-4ce7-87a5-5d5f28cde5cd',
+        '1306ee08-672d-4f77-a508-b108353cbbe7',
+        'a239618f-8ad1-4adf-8f18-29572ea00c9a',
+        'bb2844b1-26cb-47fa-ae60-162141615c25',
+      ],
+      sort: '9bc9c3b2-6de7-4aad-9203-162889057f59',
+    },
+    streamCompetitorsWidget: {
+      view: '65608052-597b-4b5a-aacf-139ae29054e6',
+      fields: [
+        'cad93ec1-946d-4842-88d8-da22f6495582',
+        'fc04397e-ae92-43b1-8a02-834b49c8d655',
+        '38ecfa61-5f69-43cb-a30a-3d5570758863',
+        '3e3287ea-462b-416d-92e0-3721ea47f56d',
       ],
     },
     streamStagesTable: {
@@ -1335,6 +1375,8 @@ export const IDS = {
   frontComponents: {
     renewalBanner: '3d4e5f60-0001-4dde-a9f4-05162738495a',
     streamKpiWidget: '40e0715c-b74f-4317-b61b-c5c6a9dd5d77',
+    streamContentWidget: 'f6f0345d-a591-4c73-93db-38cb4ebeeaed',
+    competitiveIntelWidget: '5997255f-b9f6-4528-b661-4dead218eb07',
     renewalCountWidget: '3d4e5f60-0002-4edf-ba05-162738495a6b',
     promoteToLeadButton: 'd736dec8-98e6-4e3f-9798-8983c93d700c',
     pricingDisplay: 'c62acce9-9a0d-441b-a6d7-46604fc14f0a',
@@ -1399,6 +1441,7 @@ export const IDS = {
         documents: '2caf255a-ed5f-4bc8-acb3-525f1c72c5df',
         contacts: '7b706771-355d-4c8e-9bbf-fe9e4ca94f2a',
         pipeline: '31ef5e15-7680-4003-8ea1-7333cb77da8e',
+        competitiveIntel: '6a2343ec-3a33-43b5-b642-7218e27b9d50',
       },
       widgets: {
         overviewFields: '290a004d-6c6c-4464-8f5e-6e2e11aa7937',
@@ -1407,6 +1450,9 @@ export const IDS = {
         contacts: '89324e93-99f5-4b46-9923-60635538d353',
         streamKpi: 'df984a1c-e4ca-4b2b-ae25-bd7321bc015a',
         opportunityLines: '0f6d783f-29b0-4018-b04e-2d05c17a2c9f',
+        competitors: '8c03b9ba-f93c-43a3-9bca-3b5bf03c604c',
+        streamContent: 'ccea2779-a93a-4322-b388-d07a70e123a9',
+        competitiveIntel: '5958ee07-8d5c-42f8-b7d8-d34cbd1b75a4',
       },
     },
     streamStageRecord: {
@@ -1479,6 +1525,8 @@ export const IDS = {
     enquiries: '0ddf4836-2b27-4fb2-9276-d1658e37714c',
     productStreams: '6fdbe905-ea65-4ee3-af3d-7d7d6e4b72c3',
     streamStages: '8fbdc930-2e06-4f36-876a-61ac59b343ea',
+    streamContentReport: '33870e08-dbbd-48bc-be0a-13f8fb7e83cd',
+    competitiveIntel: 'bd3f5751-6f19-47a1-8baa-18557f11f5cd',
     pricing: '506d3e76-f244-41e7-a77b-7d1dce1e395f',
     /** C2: the Pricing folder holding Offerings, Client Price Agreements, Discount Rules */
     pricingFolder: '827ccbbc-9779-47a3-99d1-1a79bbd135b9',

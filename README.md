@@ -68,6 +68,8 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
 ├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
 ├── ops/seed-stream-stages.mjs       B2: the standard 5 StreamStages per ProductStream (idempotent, --dry-run)
+├── ops/publish-stream-content.mjs   B3: mark a StreamUpdate published with its integrascientific.com URL (idempotent, --dry-run)
+├── ops/export-competitive-intel.mjs D3: competitors + price observations → competitive-intel-<date>.csv
 ├── ops/seed-pricing.mjs             creates missing offerings, price points + bundle items from shared/public-pricing.mjs
 ├── ops/publish-pricing.mjs          live pricing → validated pricing.json for the website, records a PricingPublication (.github/workflows/publish-pricing.yml)
 ├── ops/build-quote.mjs              C2: quote payload (JSON for the PDF) from an agreement or an opportunity
@@ -132,7 +134,7 @@ SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --conf
 | Enquiry Message | new | name, enquiry→, direction, body, senderEmail, sentAt, isAutoReply |
 | Enquiry Routing Rule | new | name, category, language, assignTo→WorkspaceMember, isActive, priority |
 | Product Stream | new | name, slug (unique), description, icon, sortOrder, isActive, activeUpdateCount + lastUpdateAt (denormalised, not yet computed), updates, documents, contacts |
-| Stream Update | new | title (`name`), stream→, body, updateType, publishedAt, sourceUrl |
+| Stream Update | new | title (`name`), stream→, body, updateType, publishedAt, sourceUrl, contentCategory, isPublished, publishUrl, engagementCount (B3; engagement is a placeholder, not tracked yet) |
 | Stream Document | new | title (`name`), stream→, file, version, effectiveDate, documentType |
 | Stream Stage | new | name, stream→, stageName, order, isDefault, description |
 | Opportunity Line | new | name, opportunity→, stream→, stage→, offering→, estimatedValueEur, probability, expectedCloseDate, notes, isActive, arMandate→ (C2), trainingRegistration→ (C2) |

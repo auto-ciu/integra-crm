@@ -81,6 +81,15 @@
  *      and the page-layout tabs exist, the SLA defaults are 1/4/8/24h, the
  *      macros seed is EN + ZH, and email-to-ticket's helpers (sender parsing,
  *      threading ids, routing, status after a reply) behave as specified.
+ *  24. B3 stream content: StreamUpdate has contentCategory (the five values),
+ *      isPublished (default false), publishUrl and the engagementCount
+ *      placeholder; only https integrascientific.com URLs pass; the publish
+ *      script is idempotent and validates before any API call; report view,
+ *      widget and nav.
+ *  25. D3 competitive intel: Competitor has priceObservationCount + riskLevel;
+ *      risk rules, average, CSV export (columns, quoting, formula defusing);
+ *      dashboard view sorted by risk, export script, ingest keeps the summary
+ *      fields current, Competitive Intel tab on the stream page.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -1549,6 +1558,96 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`E3 ticket management: ${problems.join('; ')}`);
   else ok(`E3 ticket management: Enquiry ticket fields, TicketMacro + SlaPolicy, inbox / my / overdue views, Thread/Details/Macros tabs, ${sla.DEFAULT_SLA_POLICIES.length} SLA defaults, ${tm.TICKET_MACROS.length} EN/ZH macros; email-to-ticket sender parsing, threading ids, routing and status rules`);
+}
+
+// ------------------------------------------------- 24. B3 stream content
+{
+  const problems = [];
+  const c = await import(pathToFileURL(join(ROOT, 'shared/stream-content.mjs')).href);
+  const fieldNames = (file) => [...stripComments(read(file)).matchAll(/\bname: '([A-Za-z]+)',\s*\n\s*label:/g)].map((m) => m[1]);
+
+  const declared = fieldNames('src/objects/stream-update.object.ts');
+  for (const n of ['contentCategory', 'isPublished', 'publishUrl', 'engagementCount']) if (!declared.includes(n)) problems.push(`stream-update.object.ts lacks ${n}`);
+  const updateSrc = stripComments(read('src/objects/stream-update.object.ts'));
+  if (!/boolean\(\{\s*universalIdentifier: F\.isPublished/.test(updateSrc)) problems.push('isPublished must be a boolean (default false)');
+  if (!/link\(\{\s*universalIdentifier: F\.publishUrl/.test(updateSrc)) problems.push('publishUrl must be a link field');
+  const category = stripComments(read('src/options.ts')).match(/STREAM_CONTENT_CATEGORY = options\(\[([\s\S]*?)\]\);/);
+  const values = category ? [...category[1].matchAll(/\['([A-Z_]+)'/g)].map((m) => m[1]).join(',') : '';
+  if (values !== 'NEWS,REGULATORY,GUIDE,CASE_STUDY,MARKET_REPORT') problems.push(`STREAM_CONTENT_CATEGORY is [${values}]`);
+
+  // Only https on integrascientific.com.
+  for (const good of ['https://integrascientific.com/news/a', 'https://www.integrascientific.com/x?y=1', 'HTTPS://Blog.IntegraScientific.com/']) if (!c.integraUrl(good)) problems.push(`integraUrl rejects ${good}`);
+  for (const bad of ['http://integrascientific.com/a', 'https://integrascientific.com.evil.example/a', 'https://evilintegrascientific.com/a', 'https://integrascientific.com@evil.example/a', 'https://user:pw@integrascientific.com/a', 'javascript:alert(1)', 'not a url', '', null]) if (c.integraUrl(bad)) problems.push(`integraUrl accepts ${bad}`);
+
+  // Publish script: validates before the API, writes only when something changes.
+  const publish = read('ops/publish-stream-content.mjs');
+  if (!publish.includes('integraUrl(') || publish.indexOf('integraUrl(') > publish.indexOf('configFromEnv()')) problems.push('publish-stream-content must validate the URL before touching the API');
+  if (!/isPublished === true && update\.publishUrl\?\.primaryLinkUrl === url/.test(publish)) problems.push('publish-stream-content must be a no-op when already published with that URL');
+
+  // View, widget, layout, nav.
+  const view = read('src/views/stream-content-report.view.ts');
+  if (!/objectUniversalIdentifier: IDS\.streamUpdate\.object,/.test(view) || !/type: ViewType\.TABLE,/.test(view)) problems.push('stream-content-report must be a TABLE view on StreamUpdate');
+  for (const col of ['name', 'contentCategory', 'publishedAt', 'engagementCount']) if (!view.includes(`[U.${col},`)) problems.push(`stream-content-report lacks ${col}`);
+  const widget = read('src/front-components/StreamContentWidget.tsx');
+  if (!widget.includes('fetchPublishedUpdates') || !widget.includes('integraUrl(')) problems.push('StreamContentWidget must fetch published updates and only link integraUrl()s');
+  if (!/isPublished: \{ eq: true \}/.test(read('src/lib/data.ts'))) problems.push('fetchPublishedUpdates must filter on isPublished');
+  if (!read('src/page-layouts/product-stream-record.page-layout.ts').includes('IDS.frontComponents.streamContentWidget')) problems.push('Product Stream page must show StreamContentWidget');
+  if (!read('src/navigation/stream-content-report.nav.ts').includes('IDS.views.streamContentReport.view')) problems.push('Stream Content nav must open the report view');
+  if (!JSON.parse(read('package.json')).scripts['stream-content:publish']) problems.push('package.json lacks stream-content:publish');
+
+  if (problems.length) fail(`B3 stream content: ${problems.join('; ')}`);
+  else ok('B3 stream content: StreamUpdate contentCategory (5 values) / isPublished / publishUrl / engagementCount placeholder; only https integrascientific.com URLs accepted (lookalikes, userinfo, http refused); idempotent publish script; report view, widget, nav');
+}
+
+// ------------------------------------------- 25. D3 competitive intel
+{
+  const problems = [];
+  const ci = await import(pathToFileURL(join(ROOT, 'shared/competitive-intel.mjs')).href);
+  const fieldNames = (file) => [...stripComments(read(file)).matchAll(/\bname: '([A-Za-z]+)',\s*\n\s*label:/g)].map((m) => m[1]);
+
+  const declared = fieldNames('src/objects/competitor.object.ts');
+  for (const n of ['priceObservationCount', 'riskLevel']) if (!declared.includes(n)) problems.push(`competitor.object.ts lacks ${n}`);
+
+  // Risk rules (now = 2026-10-04).
+  const now = new Date('2026-10-04T12:00:00Z');
+  const cases = [
+    [0, null, 'LOW'], [1, '2026-10-01', 'LOW'], [2, '2026-10-01', 'MEDIUM'], [4, '2026-07-10', 'MEDIUM'],
+    [5, '2026-10-01', 'HIGH'], [5, '2026-07-10', 'HIGH'], [5, '2026-01-01', 'MEDIUM'], [3, '2026-01-01', 'LOW'],
+  ];
+  for (const [count, latest, want] of cases) if (ci.riskLevel(count, latest, now) !== want) problems.push(`riskLevel(${count}, ${latest}) = ${ci.riskLevel(count, latest, now)}, want ${want}`);
+  const obs = [
+    { observedAt: '2026-09-01', competitorPriceEur: 100, currencyCode: 'EUR' },
+    { observedAt: '2026-10-02T08:00:00Z', competitorPriceEur: 201, currencyCode: 'EUR' },
+    { observedAt: '2026-08-01', competitorPriceEur: 999, currencyCode: 'USD' },
+  ];
+  if (ci.latestObservationDate(obs) !== '2026-10-02') problems.push('latestObservationDate must be the newest date');
+  if (ci.averageEur(obs) !== 150.5) problems.push('averageEur must ignore non-EUR observations');
+  if (ci.averageEur([]) !== null) problems.push('averageEur of nothing must be null');
+  const summary = ci.competitorSummary(obs, now);
+  if (summary.priceObservationCount !== 3 || summary.riskLevel !== 'MEDIUM') problems.push('competitorSummary must count all observations');
+
+  // CSV.
+  const csv = ci.toCsv([{ name: 'Acme, "Inc"', website: '=HYPERLINK("x")', productStreams: 'DPP', latestObservationDate: '2026-10-02', priceObservationCount: 3, avgObservedPriceEur: 150.5, riskLevel: 'MEDIUM' }]).split('\n');
+  if (csv[0] !== 'name,website,productStreams,latestObservationDate,priceObservationCount,avgObservedPriceEur,riskLevel') problems.push(`CSV header is ${csv[0]}`);
+  if (csv[1] !== '"Acme, ""Inc""","\'=HYPERLINK(""x"")",DPP,2026-10-02,3,150.5,MEDIUM') problems.push(`CSV row is ${csv[1]}`);
+
+  // Export script, ingest, view, layout.
+  const exportSrc = read('ops/export-competitive-intel.mjs');
+  if (!exportSrc.includes('competitive-intel-${today}.csv') || !exportSrc.includes('toCsv(')) problems.push('export-competitive-intel must write competitive-intel-<date>.csv via toCsv');
+  if (!/competitorSummary\(all, now\)/.test(read('src/functions/research-ingest.ts'))) problems.push('research-ingest must refresh the Competitor summary fields');
+  const view = read('src/views/competitive-intel-dashboard.view.ts');
+  if (!/objectUniversalIdentifier: IDS\.competitor\.object,/.test(view) || !/type: ViewType\.TABLE,/.test(view)) problems.push('competitive-intel-dashboard must be a TABLE view on Competitor');
+  for (const col of ['name', 'competitorOf', 'lastObservationAt', 'priceObservationCount', 'riskLevel']) if (!view.includes(`[C.${col},`)) problems.push(`competitive-intel-dashboard lacks ${col}`);
+  if (!/fieldMetadataUniversalIdentifier: C\.riskLevel,/.test(view)) problems.push('competitive-intel-dashboard must sort by riskLevel');
+  if (!/COMPETITOR_RISK_LEVEL = options\(\[\s*\['HIGH'[\s\S]*?\['MEDIUM'[\s\S]*?\['LOW'/.test(read('src/options.ts'))) problems.push('COMPETITOR_RISK_LEVEL must list HIGH, MEDIUM, LOW in that order (sort order)');
+  const layout = read('src/page-layouts/product-stream-record.page-layout.ts');
+  if (!layout.includes("title: 'Competitive Intel'") || !layout.includes('IDS.views.streamCompetitorsWidget.view') || !layout.includes('IDS.frontComponents.competitiveIntelWidget')) problems.push('Product Stream page needs the Competitive Intel tab (competitors table + observations widget)');
+  if (!read('src/front-components/CompetitiveIntelWidget.tsx').includes('fetchStreamObservations')) problems.push('CompetitiveIntelWidget must fetch via fetchStreamObservations');
+  if (!read('src/navigation/competitive-intel.nav.ts').includes('IDS.views.competitiveIntelDashboard.view')) problems.push('Competitive Intel nav must open the dashboard view');
+  if (!JSON.parse(read('package.json')).scripts['competitive-intel:export']) problems.push('package.json lacks competitive-intel:export');
+
+  if (problems.length) fail(`D3 competitive intel: ${problems.join('; ')}`);
+  else ok('D3 competitive intel: Competitor priceObservationCount + riskLevel; risk rules (HIGH / MEDIUM / LOW by count and recency), EUR average, CSV (columns, quoting, formula defusing); dashboard sorted by risk, export script, ingest refreshes the summary, Competitive Intel tab');
 }
 
 // ----------------------------------------------------------------- report

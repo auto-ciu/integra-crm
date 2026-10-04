@@ -43,6 +43,8 @@
     "training:dry": "node ops/seed-training-events.mjs --dry-run",
     "stripe:sync": "node ops/sync-to-stripe.mjs",
     "stripe:dry": "node ops/sync-to-stripe.mjs --dry-run",
+    "stream-content:publish": "node ops/publish-stream-content.mjs",
+    "competitive-intel:export": "node ops/export-competitive-intel.mjs",
     "research:seed": "node ops/seed-research-briefs.mjs",
     "research:dry": "node ops/seed-research-briefs.mjs --dry-run"
   },

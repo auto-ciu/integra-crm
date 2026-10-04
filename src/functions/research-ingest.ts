@@ -41,6 +41,7 @@ import {
   type TwentyConfig,
   type TwentyRecord,
 } from '../../ops/lib/twenty-api';
+import { competitorSummary } from '../../shared/competitive-intel.mjs';
 import { STUCK_AFTER_HOURS } from '../../shared/research-agent.mjs';
 import { PRODUCT_STREAMS } from '../../shared/streams.mjs';
 import { downloadFile, fileName, getSession, isFinished, listSessionFiles, sessionCostUsd } from './lib/managed-agents';
@@ -188,6 +189,12 @@ async function ingestReport(
       ...(o.sourceUrl ? { sourceUrl: link(o.sourceUrl) } : {}),
       ...(o.notes ? { notes: markdown(o.notes) } : {}),
     });
+  }
+
+  // Keep the Competitor summary fields (observation count, risk) in step with the observations.
+  for (const competitorId of new Set(competitorIds.values())) {
+    const all = await findAllRecords(config, 'competitorPriceObservations', { filter: eq('competitorId', competitorId) });
+    await updateRecord(config, 'competitors', competitorId, competitorSummary(all, now));
   }
 
   const reportFile = files.find((f) => fileName(f).split('/').pop() === 'report.md');
