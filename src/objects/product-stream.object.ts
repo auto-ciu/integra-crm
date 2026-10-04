@@ -94,6 +94,14 @@ export default defineObject({
       inverseFieldId: IDS.streamDocument.fields.stream,
     }),
     oneToMany({
+      universalIdentifier: F.discoveredCompanies,
+      name: 'discoveredCompanies',
+      label: 'Recommended for · 推荐线索',
+      icon: 'IconBuildingFactory2',
+      targetObjectId: IDS.discoveredCompany.object,
+      inverseFieldId: IDS.discoveredCompany.fields.recommendedStream,
+    }),
+    oneToMany({
       universalIdentifier: F.contacts,
       name: 'contacts',
       label: 'Contacts · 联系人',

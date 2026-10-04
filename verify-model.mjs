@@ -57,6 +57,12 @@
  *  19. D1-D2 research: one prompt per researchable product category, the
  *      prompt builder, and the BLOCKED answer while there is no API key.
  *
+ *  20. F0.5: Person, Company and Opportunity have leadSource.
+ *  21. A2 lead import + enrichment: LeadImport and the DiscoveredCompany A2
+ *      fields exist, the import / enrichment / Safety Gate / GDPR Art.14
+ *      functions exist with their budgets, dedupe keys, row mapping, risk
+ *      levels and the Art.14 notice behave as specified.
+ *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -76,7 +82,7 @@ const EXPECTED_OBJECTS = [
   'ProductStream', 'StreamUpdate', 'StreamDocument', 'StreamContact', 'FairLead',
   'Offering', 'PricePoint', 'BundleItem', 'PricingPublication',
   'ReplyTemplate',
-  'LeadDiscoveryRun', 'DiscoveredCompany',
+  'LeadDiscoveryRun', 'DiscoveredCompany', 'LeadImport',
   'TrainingRegistration',
   'CustomerEvent', 'ResearchBrief',
 ];
@@ -1019,6 +1025,90 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
   }
   if (problems.length) fail(`F0.5 leadSource: ${problems.join('; ')}`);
   else ok(`F0.5 leadSource: Person, Company, and Opportunity all have leadSource field`);
+}
+
+// ------------------------------------------- 21. A2 lead import + enrichment
+{
+  const problems = [];
+  const li = await import(pathToFileURL(join(ROOT, 'shared/lead-import.mjs')).href);
+  const fieldNames = (file) => [...(sources[join(SRC, file)] ?? '').matchAll(/\bname:\s*'(\w+)'/g)].map((m) => m[1]);
+
+  const A2_FIELDS = [
+    'contactName', 'contactTitle', 'contactEmail', 'province', 'employeeBand', 'exportRevenueBand', 'euExportEvidence',
+    'hasEuAr', 'recommendedStream', 'icpScore', 'icpTier', 'scoreRationale', 'scoreCitations', 'scoreModel',
+    'scoreRubricVersion', 'scoredAt', 'dedupeKey', 'reviewStatus', 'rejectReason', 'reviewedBy', 'importId',
+    'isGdprArt14Sent', 'gdprArt14SentAt', 'isPotentialCompetitor',
+  ];
+  const KEPT_FIELDS = [
+    'companyName', 'companyNameZh', 'website', 'linkedinUrl', 'industry', 'companySize', 'headquarters', 'productCategories',
+    'description', 'emailDomains', 'isExportedToCRM', 'exportedCompanyId', 'isDuplicate', 'score', 'scoreBreakdown',
+  ];
+  const dc = fieldNames('objects/discovered-company.object.ts');
+  const missingDc = [...A2_FIELDS, ...KEPT_FIELDS].filter((f) => !dc.includes(f));
+  if (missingDc.length) problems.push(`DiscoveredCompany lacks ${missingDc.join(', ')}`);
+  const dcSource = sources[join(SRC, 'objects/discovered-company.object.ts')] ?? '';
+  if (!/uniqueText\(\{[^}]*name:\s*'dedupeKey'/.test(dcSource)) problems.push('DiscoveredCompany.dedupeKey must be unique');
+  if (!/name:\s*'reviewStatus'[^\n]*defaultValue:\s*'NEW'/.test(dcSource)) problems.push("DiscoveredCompany.reviewStatus must default to 'NEW'");
+
+  const LEAD_IMPORT_FIELDS = ['name', 'fileName', 'status', 'rowCount', 'importedCount', 'duplicateCount', 'errorCount', 'source', 'uploadedBy', 'startedAt', 'completedAt', 'errorLog'];
+  if (!existsSync(join(SRC, 'objects/lead-import.object.ts'))) problems.push('src/objects/lead-import.object.ts is missing');
+  const imp = fieldNames('objects/lead-import.object.ts');
+  const missingImp = LEAD_IMPORT_FIELDS.filter((f) => !imp.includes(f));
+  if (missingImp.length) problems.push(`LeadImport lacks ${missingImp.join(', ')}`);
+
+  const FUNCTIONS = ['import-leads-csv', 'enrich-discovered-company', 'check-safety-gate', 'send-gdpr-art14'];
+  for (const f of FUNCTIONS) if (!existsSync(join(SRC, 'functions', `${f}.ts`))) problems.push(`src/functions/${f}.ts is missing`);
+  for (const f of ['ops/import-leads.mjs', 'ops/enrich-all-new.mjs', 'src/views/lead-imports-table.view.ts']) if (!existsSync(join(ROOT, f))) problems.push(`${f} is missing`);
+
+  const viewSource = sources[join(SRC, 'views/discovered-companies-table.view.ts')] ?? '';
+  for (const f of ['reviewStatus', 'icpTier', 'icpScore', 'isGdprArt14Sent']) if (!viewSource.includes(`D.${f}`)) problems.push(`discovered companies view lacks ${f}`);
+
+  // budgets
+  if (li.ENRICHMENT_BUDGET_USD !== 0.5) problems.push('enrichment budget must be $0.50');
+  if (li.SAFETY_CHECK_BUDGET_USD !== 0.3) problems.push('Safety Gate budget must be $0.30');
+  const maxEnrichPrompt = 40_000;
+  if (li.worstCaseUsd(maxEnrichPrompt, li.ENRICHMENT_MAX_OUTPUT_TOKENS) > li.ENRICHMENT_BUDGET_USD) problems.push('a 40k-token enrichment prompt must fit the $0.50 cap');
+  if (li.worstCaseUsd(0, li.SAFETY_MAX_OUTPUT_TOKENS, li.SAFETY_MAX_SEARCHES) > li.SAFETY_CHECK_BUDGET_USD) problems.push('Safety Gate max_tokens + searches must fit the $0.30 cap');
+  if (!/maxInputTokens|worstCaseUsd\(/.test(sources[join(SRC, 'functions/enrich-discovered-company.ts')] ?? '')) problems.push('enrich-discovered-company must check the worst case against the cap');
+  if (!/max_uses:\s*SAFETY_MAX_SEARCHES/.test(sources[join(SRC, 'functions/check-safety-gate.ts')] ?? '')) problems.push('check-safety-gate must cap web searches');
+
+  // dedupe
+  const same = (a, b) => li.dedupeKey(a) === li.dedupeKey(b);
+  if (!same({ linkedinUrl: 'https://cn.linkedin.com/company/Foo/?x=1' }, { linkedinUrl: 'linkedin.com/company/foo' })) problems.push('the same LinkedIn page must give one dedupeKey');
+  if (!same({ companyName: 'Shenzhen ABC Co., Ltd.', headquarters: 'Shenzhen, China' }, { companyName: 'shenzhen abc ltd', headquarters: 'Shenzhen' })) problems.push('name + headquarters dedupeKey must ignore case, punctuation and company suffixes');
+  if (same({ companyName: 'ABC', headquarters: 'Shenzhen' }, { companyName: 'ABC', headquarters: 'Ningbo' })) problems.push('different headquarters must give different dedupeKeys');
+  if (li.likelySameCompany({ companyName: 'ABC Ltd', headquarters: '' }, { companyName: 'ABC Ltd', headquarters: '' })) problems.push('no headquarters is not a likely duplicate');
+
+  // row mapping
+  const row = li.mapImportRow({ 'Company Name': 'ABC', LinkedIn: 'https://www.linkedin.com/company/abc/about', Website: 'www.abc.cn/en?x=1', HQ: 'Shenzhen', Email: 'sales@abc.cn' });
+  if (!row.ok || row.record.linkedinUrl !== 'https://www.linkedin.com/company/abc' || row.record.website !== 'https://www.abc.cn' || row.record.contactEmail !== 'sales@abc.cn') problems.push('mapImportRow does not normalise headers, LinkedIn, website');
+  for (const bad of [{}, { companyName: 'X', linkedinUrl: 'https://www.linkedin.com/in/someone' }, { companyName: 'X', contactEmail: 'nope' }, { companyName: 'X', website: 'not a url' }]) {
+    if (li.mapImportRow(bad).ok) problems.push(`mapImportRow accepts ${JSON.stringify(bad)}`);
+  }
+
+  // enrichment helpers: employee band, SSRF guard
+  const bands = [[5, 'MICRO_1_10'], [11, 'SMALL_11_50'], [200, 'MEDIUM_51_200'], [201, 'LARGE_201_PLUS']];
+  for (const [n, want] of bands) if (li.employeeBand(n) !== want) problems.push(`employeeBand(${n}) ≠ ${want}`);
+  for (const host of ['localhost', '127.0.0.1', '10.0.0.5', '192.168.1.1', '172.16.0.1', '169.254.169.254', '::1']) if (!li.isPrivateHost(host)) problems.push(`isPrivateHost(${host}) must be true`);
+  if (li.isPrivateHost('www.example.com') || li.isPrivateHost('8.8.8.8')) problems.push('isPrivateHost rejects a public host');
+
+  // Safety Gate
+  if (li.riskLevel(0) !== 'LOW' || li.riskLevel(2) !== 'MEDIUM' || li.riskLevel(3) !== 'HIGH') problems.push('riskLevel must be LOW 0 · MEDIUM 1–2 · HIGH 3+');
+  if (li.penalisedScore(80, 'HIGH') !== 55 || li.penalisedScore(5, 'HIGH') !== 0 || li.penalisedScore(80, 'LOW') !== 80) problems.push('Safety Gate score penalty is wrong');
+
+  // ICP tier
+  if (li.icpTier(80) !== 'TIER_1_HOT' || li.icpTier(50) !== 'TIER_2_WARM' || li.icpTier(10) !== 'TIER_3_COLD') problems.push('icpTier thresholds are wrong');
+
+  // GDPR Art.14
+  const notice = li.gdprArt14Notice({ companyName: 'ABC', contactName: '', contact: 'privacy@example.com' });
+  for (const [what, re] of [['controller', /Integra Scientific Ltd/], ['data held', /name .*company name.*website.*LinkedIn/s], ['source', /Where it comes from/], ['legitimate interest', /legitimate interest/], ['retention', /How long we keep it/], ['rights', /access.*rectify.*erase.*object/s], ['complaint', /supervisory authority/], ['contact', /privacy@example\.com/]]) {
+    if (!re.test(notice)) problems.push(`Art.14 notice lacks ${what}`);
+  }
+  const gdpr = sources[join(SRC, 'functions/send-gdpr-art14.ts')] ?? '';
+  if (!/Send GDPR Art\.14 notice to \$\{companyName\}/.test(gdpr) || !/isGdprArt14Sent: true/.test(gdpr) || !/gdprArt14SentAt/.test(gdpr)) problems.push('send-gdpr-art14 must create the Task and mark the record');
+
+  if (problems.length) fail(`A2 lead import + enrichment: ${problems.join('; ')}`);
+  else ok(`A2 lead import + enrichment: LeadImport (${imp.length} fields) + ${A2_FIELDS.length} new DiscoveredCompany fields (${KEPT_FIELDS.length} kept); ${FUNCTIONS.length} functions; budgets $${li.ENRICHMENT_BUDGET_USD}/$${li.SAFETY_CHECK_BUDGET_USD}; dedupe keys, row mapping, SSRF guard, risk levels, ICP tiers, Art.14 notice`);
 }
 
 // ----------------------------------------------------------------- report

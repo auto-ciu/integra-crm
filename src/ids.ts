@@ -76,6 +76,10 @@ export const IDS = {
       enquiryRoutingRules: '31d901f7-1e00-47e4-8523-184621a2cfee',
       /** inverse of pricingPublication.publishedBy */
       pricingPublications: '7d277f8e-daec-4459-9859-8777979dd975',
+      /** inverse of leadImport.uploadedBy */
+      leadImports: '69bfeca8-1acb-4850-af8c-d795b2deacfc',
+      /** inverse of discoveredCompany.reviewedBy */
+      reviewedDiscoveredCompanies: '95d56fce-7719-4b5a-a475-e1b5bb0b3292',
     },
   },
 
@@ -204,6 +208,8 @@ export const IDS = {
       documents: '6a0a7307-bd71-45bf-b683-5a0154c442c3',
       /** inverse of streamContact.stream */
       contacts: '7923cde6-6833-4beb-bbed-2f35a7a2585e',
+      /** inverse of discoveredCompany.recommendedStream */
+      discoveredCompanies: '453955ec-354c-48b1-bf46-4a3bbd23f790',
     },
   },
 
@@ -368,6 +374,27 @@ export const IDS = {
     },
   },
 
+  /** A2: CSV/XLSX lead import batch. */
+  leadImport: {
+    object: '1b99d4a5-1e50-4dc5-9909-2405f82affde',
+    fields: {
+      name: '9744428c-44e3-4dc0-b064-c2e075a24df1',
+      fileName: '300c8d16-2f1b-460e-93f5-699d44fd154d',
+      status: '1aa0f7bb-ae6f-4417-b066-59098771f7d4',
+      rowCount: 'e3952834-4937-47f7-bb66-4e7cb4f28723',
+      importedCount: '8e9f8022-ff39-431c-83a9-cd6d0be10d4a',
+      duplicateCount: '21dcafda-5f7f-4817-8513-922aba69c14a',
+      errorCount: '2d1f3d1d-e387-4432-8fd9-b33479622ab3',
+      source: 'a1209e1f-a866-4845-98be-52beff7c1529',
+      uploadedBy: '0abd7878-3baf-40e4-b6c3-89a578b3f95c',
+      startedAt: 'f31ca8ab-63dd-43a9-ac24-f0f560e26192',
+      completedAt: 'f23bcb7e-6211-446f-8196-fea6ccc03377',
+      errorLog: '3953d830-dfa1-4101-9a13-814ed550c87f',
+      /** inverse of discoveredCompany.importId */
+      discoveredCompanies: '786d0998-ab0e-4750-91d3-d8a1ac70a93d',
+    },
+  },
+
   discoveredCompany: {
     object: '21e4dd96-32d6-4dd5-b96f-059639532279',
     fields: {
@@ -387,6 +414,30 @@ export const IDS = {
       isDuplicate: '8076b7e3-d86f-41d5-a205-6bd3ebbee9b8',
       score: '7a6f379c-caa6-4366-9555-f7deaddfb4e7',
       scoreBreakdown: 'd02918ef-af9a-4eec-a910-0999ef6bc876',
+      contactName: '2a890143-3408-4312-9db2-5c8ed929f9d5',
+      contactTitle: '05000887-f27b-4516-b92b-e33342ee6912',
+      contactEmail: '0eb7e5a7-1467-414c-8ee6-e09933d8847e',
+      province: '4dcc6fdd-e6e5-4248-ba95-a440e90c451a',
+      employeeBand: 'f694efd2-f17d-4fcd-b911-528477ac77d0',
+      exportRevenueBand: '757fa1e5-08e6-4512-807f-5e69687cb11d',
+      euExportEvidence: 'e6d22b11-b9b5-40ca-9e8c-df8c9f1374d9',
+      hasEuAr: '500f3e99-0e2f-4d1c-af97-7c39c7bee7ba',
+      recommendedStream: '506a9de5-4757-45a9-a972-c1b45c667383',
+      icpScore: '21a8f9f3-4d59-440d-bcbd-b7d029215a9d',
+      icpTier: 'e5f1d1de-11a5-4d19-a64e-a6dae2c9c000',
+      scoreRationale: '6456ade5-a42d-4031-899e-1d2252501172',
+      scoreCitations: '10c42416-ee7f-4caa-a545-48d02426db24',
+      scoreModel: '7c68573b-83c1-450d-b7f8-8491fed4ab8b',
+      scoreRubricVersion: 'cc1907d6-39a5-4135-ae2c-2f1a7c17e454',
+      scoredAt: 'dc18cbf1-9219-4a6b-885b-6bc89160dbcd',
+      dedupeKey: '6a121c30-4efd-43b1-9fab-9b08622f6be6',
+      reviewStatus: 'ad341ae9-6fb1-443b-b9fb-74ebed606396',
+      rejectReason: '90fe660f-86ce-4304-aee1-b98bb5e7a2b8',
+      reviewedBy: '476d4e8e-6334-4b19-8a79-d76473fe9641',
+      importId: '7240310f-8815-410c-9d6c-04693ff24983',
+      isGdprArt14Sent: '11d473c1-ceb7-4d42-b0eb-0f47fec950a5',
+      gdprArt14SentAt: '5f3cad63-ed8a-49e3-ada9-b81925741531',
+      isPotentialCompetitor: '3aed4004-c515-42e3-b0d0-47b98e114f06',
     },
   },
 
@@ -743,6 +794,19 @@ export const IDS = {
       ],
       sort: 'ddb00f38-925f-47fe-b776-464a24c6baca',
     },
+    leadImportsTable: {
+      view: '762e69e8-d27c-4cd0-8869-3fb8cac72a34',
+      fields: [
+        'd6b7acfe-6cde-4be2-8c5f-ec3f7e91bad3',
+        '89d172f5-21a4-4c43-88d0-063d01f23298',
+        'aa2d4d63-cc7b-4704-829a-68dd0a1e5459',
+        '63646aba-9054-47ff-b78a-58e7b8f79c10',
+        '43353f71-3f10-4f3c-89e2-6b9a9590f591',
+        '8bfd6643-8287-4617-884e-a4bda2ee16b1',
+        'a786bb5f-cd14-4a46-af79-e42eaae93117',
+      ],
+      sort: '595011fb-a284-4d09-951a-3d1a4dafac8c',
+    },
     discoveredCompaniesTable: {
       view: '89cbbb30-9edc-47fb-b651-1a2c3eb68079',
       fields: [
@@ -751,6 +815,10 @@ export const IDS = {
         'a283ff03-b050-441b-819d-8c8c04a5780b',
         '5cfbe6e2-b8e9-4bcd-b49b-2956f92fcd38',
         '59a863d9-7479-4ffa-bcb6-e018ae2c0426',
+        '04b0e639-e428-412e-abca-94f3539479f4',
+        '58bccdbf-27e3-4046-94d5-b3ef2a2775b7',
+        '4bda7f54-299b-4d39-9920-1bbbbff3650c',
+        '76228e3b-aee6-44d4-b66c-5fb7e5f22f8a',
       ],
       sort: '0088517a-8865-4274-b6fd-f6ce4b2b0c23',
     },

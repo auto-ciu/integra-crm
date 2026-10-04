@@ -273,6 +273,52 @@ export const DISCOVERY_SOURCE = options([
   ['APIFY_LINKEDIN', 'LinkedIn via Apify', 'blue'],
 ]);
 
+// ------------------------------------------- A2 lead import + enrichment
+
+export const LEAD_IMPORT_STATUS = options([
+  ['UPLOADED', 'Uploaded · 已上传', 'gray'],
+  ['PARSING', 'Parsing · 解析中', 'sky'],
+  ['PARSED', 'Parsed · 已解析', 'blue'],
+  ['IMPORTING', 'Importing · 导入中', 'sky'],
+  ['DONE', 'Done · 已完成', 'green'],
+  ['FAILED', 'Failed · 失败', 'red'],
+]);
+
+export const LEAD_IMPORT_SOURCE = options([
+  ['CSV', 'CSV', 'blue'],
+  ['UPLOAD', 'File upload · 文件上传', 'purple'],
+  ['MANUAL_ENTRY', 'Manual entry · 手动录入', 'gray'],
+]);
+
+export const EMPLOYEE_BAND = options([
+  ['MICRO_1_10', '1–10', 'gray'],
+  ['SMALL_11_50', '11–50', 'sky'],
+  ['MEDIUM_51_200', '51–200', 'blue'],
+  ['LARGE_201_PLUS', '201+', 'purple'],
+]);
+
+export const LEAD_EXPORT_REVENUE_BAND = options([
+  ['NONE', 'None · 无', 'gray'],
+  ['UNDER_1M', 'Under €1M', 'sky'],
+  ['1M_5M', '€1M–5M', 'blue'],
+  ['5M_20M', '€5M–20M', 'green'],
+  ['20M_PLUS', '€20M+', 'purple'],
+  ['UNKNOWN', 'Unknown · 未知', 'gray'],
+]);
+
+export const ICP_TIER = options([
+  ['TIER_1_HOT', 'Tier 1 · Hot', 'red'],
+  ['TIER_2_WARM', 'Tier 2 · Warm', 'orange'],
+  ['TIER_3_COLD', 'Tier 3 · Cold', 'sky'],
+]);
+
+export const LEAD_REVIEW_STATUS = options([
+  ['NEW', 'New · 新', 'sky'],
+  ['ACCEPTED', 'Accepted · 已接受', 'green'],
+  ['REJECTED', 'Rejected · 已拒绝', 'red'],
+  ['DUPLICATE', 'Duplicate · 重复', 'gray'],
+]);
+
 // ----------------------------------------------- X5 training registration
 
 export const TRAINING_REGISTRATION_STATUS = options([

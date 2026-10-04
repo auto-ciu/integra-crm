@@ -8,7 +8,8 @@
  *   product category up to 40 · website + LinkedIn 10 · e-mail domains 15 ·
  *   size 5/10/15 · headquarters in China 10 · industry match 10
  *
- * Writes DiscoveredCompany.score and scoreBreakdown (markdown); responds
+ * Writes DiscoveredCompany.score and scoreBreakdown (markdown), plus the A2
+ * icpScore / icpTier / scoreModel / scoreRubricVersion / scoredAt; responds
  * `{ score, breakdown }`.
  *
  * Env: TWENTY_API_URL, TWENTY_API_KEY (an API key whose role can write
@@ -17,6 +18,7 @@
 import { z } from 'zod';
 
 import { TwentyApiError, configFromEnv, eq, findRecords, updateRecord, type TwentyConfig } from '../../ops/lib/twenty-api';
+import { SCORE_MODEL, SCORE_RUBRIC_VERSION, icpTier } from '../../shared/lead-import.mjs';
 import { breakdownMarkdown, scoreDiscoveredCompany as scoreCompany } from '../../shared/lead-discovery.mjs';
 import { json, readAuthorisedJson, type HttpEvent, type HttpResult } from './lib/sidecar';
 
@@ -45,6 +47,12 @@ export async function scoreDiscoveredCompany(config: TwentyConfig, discoveredCom
 
   await updateRecord(config, 'discoveredCompanies', discoveredCompanyId, {
     score: result.score,
+    // A2: the rule score also fills the ICP fields, so a scored lead leaves the "no icpScore" queue.
+    icpScore: result.score,
+    icpTier: icpTier(result.score),
+    scoreModel: SCORE_MODEL,
+    scoreRubricVersion: SCORE_RUBRIC_VERSION,
+    scoredAt: new Date().toISOString(),
     scoreBreakdown: { markdown: breakdownMarkdown(result), blocknote: null },
   });
   return { score: result.score, breakdown: result.breakdown };
