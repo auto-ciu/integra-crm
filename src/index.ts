@@ -24,13 +24,19 @@ export default defineApplication({
     SIDECAR_URL: {
       universalIdentifier: IDS.applicationVariables.sidecarUrl,
       label: 'Sidecar URL',
-      description: 'API Gateway base URL of the CRM sidecar; RegisterForTrainingButton POSTs to <SIDECAR_URL>/register-for-training',
+      description: 'API Gateway base URL of the CRM sidecar; RegisterForTrainingButton and ValidateDiscountsButton POST to <SIDECAR_URL>/<function>',
       type: FieldType.TEXT,
     },
     REGISTRATION_TOKEN: {
       universalIdentifier: IDS.applicationVariables.registrationToken,
       label: 'Registration token',
       description: 'Bearer for register-for-training only (never OPS_TOKEN): every CRM user\'s browser can read it',
+      type: FieldType.TEXT,
+    },
+    DISCOUNT_CHECK_TOKEN: {
+      universalIdentifier: IDS.applicationVariables.discountCheckToken,
+      label: 'Discount check token',
+      description: 'Bearer for validate-agreement-discounts only (read-only; never OPS_TOKEN): ValidateDiscountsButton sends it',
       type: FieldType.TEXT,
     },
   },

@@ -19,23 +19,28 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── src/objects/*.object.ts          ArMandate, MandateProduct, TrainingEvent, Authority, Enquiry, EnquiryMessage, EnquiryRoutingRule,
 │                                    ProductStream, StreamUpdate, StreamDocument, StreamContact, FairLead,
 │                                    Offering, PricePoint, BundleItem, PricingPublication, ReplyTemplate, LeadDiscoveryRun, DiscoveredCompany,
-│                                    TrainingRegistration, CustomerEvent (C3), ResearchBrief (D1-D2)
+│                                    TrainingRegistration, CustomerEvent (C3), ResearchBrief (D1-D2),
+│                                    ClientPriceAgreement, AgreementLine, DiscountRule (C2 deals)
 ├── src/views/                       Companies table, Pipeline kanban, Renewals, Fair leads, Enquiries table + Inbox kanban,
 │                                    Product Streams table, Offerings, Price Points, Bundle Items + Pricing Publications tables, Reply Templates table,
-│                                    Lead Discovery + Discovered Companies tables, Training Registrations table, widgets
+│                                    Lead Discovery + Discovered Companies tables, Training Registrations table,
+│                                    Client Price Agreements, Agreement Lines + Discount Rules tables, widgets
 ├── src/page-layouts/                AR Mandate record page (5 tabs), Enquiry record page (3 tabs), Product Stream record page (4 tabs),
 │                                    Offering record page (3 tabs), Training Event record page (2 tabs),
-│                                    Research Brief record page (Overview / Raw Result), Today (standalone)
+│                                    Research Brief record page (Overview / Raw Result),
+│                                    Client Price Agreement record page (Overview / Lines / Validation), Today (standalone)
 ├── src/front-components/            RenewalBanner, RenewalCountWidget, PromoteToLeadButton (stub), PricingDisplay (stub),
-│                                    RegisterForTrainingButton (stub)
-├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams, Pricing,
+│                                    RegisterForTrainingButton (stub), ValidateDiscountsButton (C2)
+├── src/navigation/*.nav.ts          sidebar: Today, AR Mandates, Training Events, Authorities, Enquiries, Product Streams,
+│                                    Pricing folder (Offerings, Client Price Agreements, Discount Rules),
 │                                    Lead Discovery, Portal Events, Market Research
 ├── src/logic-functions/             F0.3 spike: health-check (httpRoute), company-created (databaseEvent), daily-heartbeat (cron)
 ├── src/functions/                   REST sidecar (F0.3b) Lambdas: enquiry-intake, enquiry-triage (stub), fair-lead-intake,
 │                                    score-fair-lead (A1 stub), send-auto-reply (E2), generate-stream-digest (B2),
 │                                    renewals-check, send-renewal-notifications (stub), run-linkedin-discovery, apify-webhook,
 │                                    score-discovered-company, promote-discovered-company (A2), register-for-training (X5),
-│                                    sync-pricing-to-stripe + stripe-webhook (C2), sync-portal-event (C3), research-scheduler + research-ingest (D1-D2, Claude Managed Agents);
+│                                    sync-pricing-to-stripe + stripe-webhook (C2), validate-agreement-discounts +
+│                                    link-mandate-pricing (C2 deals), sync-portal-event (C3), research-scheduler + research-ingest (D1-D2, Claude Managed Agents);
 │                                    lib/sidecar.ts shared HTTP + CRM helpers, lib/discovery.ts Apify client, lib/stripe.ts Stripe client. Not app entities
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
 ├── shared/urgency.mjs               renewal maths shared by widgets and renewals-check (planMandate)
@@ -47,6 +52,7 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── shared/public-pricing.mjs        C1 pricing: option sets, D3 display rules, canonical offerings, PublicPricingV1 schema + pricing.json transform
 ├── shared/lead-discovery.mjs        A2: Apify actor pin, cost estimate + caps, guardrails, item mapping, discovery score rules
 ├── shared/stripe-sync.mjs           C2: CRM pricing → Stripe product/price mapping, sync plan, webhook signature check
+├── shared/agreement-pricing.mjs     C2 deals: agreement options, discount maths + rules, quotes, preview overlay, mandate → lines
 ├── shared/portal-events.mjs         C3: customer event types/sources, which events open a pipeline Opportunity
 ├── shared/research-prompts.mjs      D1-D2: one prompt per product category, depth/status options, prompt builder
 ├── shared/training.mjs              X5: the three seed training events, event-passed + registration rules
@@ -60,6 +66,8 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── ops/seed-stream-stages.mjs       B2: the standard 5 StreamStages per ProductStream (idempotent, --dry-run)
 ├── ops/seed-pricing.mjs             creates missing offerings, price points + bundle items from shared/public-pricing.mjs
 ├── ops/publish-pricing.mjs          live pricing → validated pricing.json for the website, records a PricingPublication (.github/workflows/publish-pricing.yml)
+├── ops/build-quote.mjs              C2: quote payload (JSON for the PDF) from an agreement or an opportunity
+├── ops/trigger-preview.mjs          C2: pricing.json + an agreement's prices → pricing-preview/<code> branch of the website (--dry-run)
 ├── ops/discover-leads.mjs           A2: start an Apify LinkedIn company run via run-linkedin-discovery (--dry-run, --wait)
 ├── ops/seed-training-events.mjs     creates missing TrainingEvent records from shared/training.mjs (--dry-run)
 ├── docs/logic-function-spike.md     F0.3 findings: what logic functions can do on 2.41, and the decision
@@ -96,6 +104,8 @@ TWENTY_API_URL=… TWENTY_API_KEY=… SIDECAR_URL=… OPS_TOKEN=… npm run dige
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run training:dry  # then training:seed
 TWENTY_API_URL=… TWENTY_API_KEY=… STRIPE_SECRET_KEY=sk_test_… npm run stripe:dry   # preview; then SIDECAR_URL=… OPS_TOKEN=… npm run stripe:sync
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run research:dry  # then research:seed
+TWENTY_API_URL=… TWENTY_API_KEY=… npm run quote -- --agreement=CPA-2026-001 --out=quote.json   # or --opportunity=<id>
+TWENTY_API_URL=… TWENTY_API_KEY=… npm run pricing:preview:dry -- --agreement=CPA-2026-001     # then PORTAL_GITHUB_TOKEN=… PORTAL_PRICING_PATH=… npm run pricing:preview -- --agreement=…
 npm run discover:dry -- --config=leads.json                                # cost + query preview, no network
 SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --config=leads.json --wait
 ```
@@ -104,8 +114,8 @@ SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --conf
 
 | Object | Kind | Fields added |
 | --- | --- | --- |
-| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents, enquiries, fairLeads, trainingRegistrations inverses) |
-| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus (+ enquiries, fairLeads, streamContacts, trainingRegistrations inverses) |
+| Company | extend | nameZh, wechatId, province, productCategory, exportRevenueBand, tier (+ arMandates, trainingEvents, enquiries, fairLeads, trainingRegistrations, clientPriceAgreements inverses) |
+| Person | extend | wechatId, roleTitle, language, preferredChannel, lastWeChatContact, leadStatus (+ enquiries, fairLeads, streamContacts, trainingRegistrations, clientPriceAgreements, signedClientPriceAgreements inverses) |
 | Opportunity | extend | productLine, tier, leadSource (fair name, text) (+ enquiries inverse); stage set replaced by `ops/sync-opportunity-stages.mjs` |
 | WorkspaceMember | extend | enquiryRoutingRules inverse (unverified on a live server, see below) |
 | AR Mandate | new | company→, status, startDate, endDate, renewalDate, docusignEnvelopeId, annualFee (EUR), signatory, urgency (computed), documents (files), products |
@@ -120,13 +130,16 @@ SIDECAR_URL=… OPS_TOKEN=… APIFY_WEBHOOK_TOKEN=… npm run discover -- --conf
 | Stream Update | new | title (`name`), stream→, body, updateType, publishedAt, sourceUrl |
 | Stream Document | new | title (`name`), stream→, file, version, effectiveDate, documentType |
 | Stream Stage | new | name, stream→, stageName, order, isDefault, description |
-| Opportunity Line | new | name, opportunity→, stream→, stage→, offering→, estimatedValueEur, probability, expectedCloseDate, notes, isActive |
+| Opportunity Line | new | name, opportunity→, stream→, stage→, offering→, estimatedValueEur, probability, expectedCloseDate, notes, isActive, arMandate→ (C2), trainingRegistration→ (C2) |
 | Stream Contact | new | name, stream→, person→, role, notes |
 | Fair Lead | new | scanId (unique, label), person→, company→, companyName, source, productInterest (multi), notes, businessCardImage, followUpStatus, capturedAt, score, scoreBreakdown, scoredAt |
 | Offering | new | name, offeringCode (unique), productCategory, strategyType, displayFormat, fromPrefix, hasOptionalExtras, isActive, description, features (rich text), validFrom, validUntil, sortOrder, pricePoints, bundleItems, componentOf |
 | Price Point | new | name, correlationId (unique), offering→, tier, annualFeeEur, setupFeeEur, currencyCode, isHighlighted, isOnRequest, isLegacy, sortOrder, description |
 | Bundle Item | new | name, bundle→ (a BUNDLE offering), component→ (a non-BUNDLE offering), included, sortOrder |
 | Pricing Publication | new | name, publishedAt, version, publishedBy→ (workspace member), commitSha, isLive, notes |
+| Client Price Agreement | new | name, agreementCode (unique, CPA-2026-001), client→Company, contact→Person, opportunity→, status, agreementType, startDate, endDate, signedAt, signedBy→Person, preparedBy→WorkspaceMember, notes, lines |
+| Agreement Line | new | name, agreement→, offering→, pricePoint→, agreedPriceEur, discountPercent, discountRationale, quantity, effectiveFrom, effectiveUntil |
+| Discount Rule | new | name, offering→ (empty = global), maxDiscountPercent, approver→WorkspaceMember, minAgreementValueEur, isActive |
 | Reply Template | new | name, category (ENQUIRY_CATEGORY + ALL), language (EN/ZH/ALL), subject, body, isActive, sortOrder |
 | Lead Discovery Run | new | name, status, source, query (JSON + actor build), resultsCount, resultsNew, costUsd, runId (unique, Apify), startedAt, completedAt, errorMessage, discoveredCompanies |
 | Discovered Company | new | discoveryRun→, companyName (label), companyNameZh, website, linkedinUrl, industry, companySize, headquarters, productCategories (multi), description, emailDomains, isExportedToCRM, exportedCompanyId, isDuplicate, score, scoreBreakdown |
@@ -152,6 +165,25 @@ and every price point of a contact-CTA / hidden / quote-only offering carry
 it). The file goes to integrascientific/integra-scientific by hand, since that
 repo is under another GitHub account. The "Publish pricing" workflow uploads it
 as an artifact; the steps are in `ops/publish-pricing.mjs`.
+
+Client price agreements (C2): a Client Price Agreement holds the prices
+agreed with one client as Agreement Lines (an offering, usually one of its
+price points, an agreed price per year or seat, a quantity). The Validation
+tab's "Check discounts" button runs `validate-agreement-discounts`, which
+measures each line against the **standard** price: the list price less the
+AR + DPP bundle discount (15%) when the agreement holds both, computed and
+never stored. The governing Discount Rule is the offering's own, else a global
+one, among rules whose `minAgreementValueEur` the agreement reaches (the
+highest minimum wins); a line above its `maxDiscountPercent` needs the rule's
+approver. `npm run quote` builds the quote JSON for an agreement, or for an
+opportunity from its lines at the opportunity's tier. `link-mandate-pricing`
+turns an AR mandate's products into OpportunityLines (AR; DPP when a product
+has a DPP under way; battery passport for a battery product with one), priced
+from the mandate fee, else a binding agreement, else the price list.
+`npm run pricing:preview` applies an agreement to `pricing.json` and commits
+it to `pricing-preview/<agreementCode>` in the website repo; `:dry` only
+writes the file. The staff member on an agreement is `preparedBy`: Twenty
+reserves `createdBy`.
 
 LinkedIn lead discovery (A2): `npm run discover` asks the
 `run-linkedin-discovery` sidecar to start Apify's `harvestapi/linkedin-company`
@@ -237,9 +269,12 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      the same generated-client caveat as item 1.
    - `PricePoint.currencyCode` is not called `currency`, which Twenty reserves
      (like `type`). `pricing.json` still calls it `currency`.
-   - The "Pricing" sidebar item is a `VIEW` item named "Pricing", so the label
-     is "Pricing" rather than the object's plural. Whether the sidebar shows
-     `name` for VIEW items is unconfirmed.
+   - "Pricing" is now a sidebar `FOLDER` (C2) holding the Offerings,
+     Client Price Agreements and Discount Rules `VIEW` items. Whether the
+     sidebar shows `name` for VIEW items, and whether app-defined folders and
+     `folderUniversalIdentifier` sync on 2.41, is unconfirmed: if not, drop
+     `pricing-folder.nav.ts` and the `folderUniversalIdentifier` lines and the
+     three items show at the top level.
 7. Wave 2 (E2 / B2 / renewals):
    - `renewals-check` links its Notes to the mandate with a `noteTargets`
      record keyed `arMandateId`. That assumes Twenty adds a noteTarget
@@ -310,7 +345,27 @@ Verified against the installed twenty-sdk / twenty-client-sdk **2.41.0**:
      wiring, and nothing has run against the live API.
      Env: `ANTHROPIC_API_KEY`, `RESEARCH_ENVIRONMENT_ID`, optional
      `RESEARCH_DEFAULT_ASSIGNEE_ID`.
-10. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
+10. C2 deals (client price agreements):
+   - The Client Price Agreement page's Lines table (`RECORD_TABLE`) has the
+     same scoping question as item 3. `AgreementLine.pricePoint` cannot be
+     filtered to the line's offering in the schema; validation reports a
+     mismatched price point and the quote / preview scripts skip it.
+   - `preparedBy` and `DiscountRule.approver` relate to WorkspaceMember, with
+     the same unverified-inverse caveat as `EnquiryRoutingRule.assignTo`.
+   - `validate-agreement-discounts` and `link-mandate-pricing` need API
+     Gateway routes. ValidateDiscountsButton calls the first from the browser
+     with `DISCOUNT_CHECK_TOKEN` (an app variable, so read-only by design);
+     the same CORS / sandbox caveats as RegisterForTrainingButton apply.
+     `link-mandate-pricing` takes `OPS_TOKEN` only, and overwrites
+     `estimatedValueEur` on the lines it links (never stage or probability).
+   - `ops/trigger-preview.mjs` was exercised against a mock Twenty and an
+     in-memory fake of GitHub's REST API only. The website repo is under
+     another GitHub account, so a real run needs `PORTAL_GITHUB_TOKEN`
+     (contents: write there) and `PORTAL_PRICING_PATH` (where pricing.json
+     lives). Cloudflare Pages previews are public by default and the branch
+     name carries the agreement code: put previews behind Cloudflare Access
+     before sending client prices through one, and delete the branch after.
+11. Logic functions run on the server only when `LOGIC_FUNCTION_TYPE` is
    `LOCAL` or `LAMBDA`. Self-hosted production defaults to `DISABLED`. Crons
    also need cron registration on the worker. See
    `docs/logic-function-spike.md`.

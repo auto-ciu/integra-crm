@@ -39,14 +39,18 @@ export function isAuthorised(header: string | undefined, token: string | undefin
 
 /**
  * Method + bearer + JSON checks every intake makes. Returns the parsed body,
- * or the error response to send back.
+ * or the error response to send back. Several tokens: any one of them will do.
  */
-export function readAuthorisedJson(event: HttpEvent, token: string | undefined): { body: unknown } | { error: HttpResult } {
+export function readAuthorisedJson(
+  event: HttpEvent,
+  token: string | undefined | Array<string | undefined>,
+): { body: unknown } | { error: HttpResult } {
   if (event.requestContext?.http?.method && event.requestContext.http.method !== 'POST') {
     return { error: json(405, { error: 'method_not_allowed' }) };
   }
   const headers = Object.fromEntries(Object.entries(event.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v]));
-  if (!isAuthorised(headers.authorization, token)) {
+  const tokens = Array.isArray(token) ? token : [token];
+  if (!tokens.some((t) => isAuthorised(headers.authorization, t))) {
     return { error: json(401, { error: 'unauthorised' }) };
   }
   try {

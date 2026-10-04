@@ -157,5 +157,23 @@ export default defineObject({
       targetObjectId: IDS.opportunityLine.object,
       inverseFieldId: IDS.opportunityLine.fields.offering,
     }),
+    oneToMany({
+      universalIdentifier: F.agreementLines,
+      name: 'agreementLines',
+      label: 'Agreement lines · 协议明细',
+      icon: 'IconFileDollar',
+      description: 'Client price agreement lines for this offering',
+      targetObjectId: IDS.agreementLine.object,
+      inverseFieldId: IDS.agreementLine.fields.offering,
+    }),
+    oneToMany({
+      universalIdentifier: F.discountRules,
+      name: 'discountRules',
+      label: 'Discount rules · 折扣规则',
+      icon: 'IconDiscount2',
+      description: 'Discount rules specific to this offering',
+      targetObjectId: IDS.discountRule.object,
+      inverseFieldId: IDS.discountRule.fields.offering,
+    }),
   ],
 });

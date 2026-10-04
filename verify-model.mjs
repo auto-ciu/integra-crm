@@ -67,6 +67,14 @@
  *  22. B2 stream pipeline: StreamStage + OpportunityLine objects, linked to
  *      ProductStream / Opportunity / Offering both ways; the standard five
  *      stages; stream KPI maths; Pipeline tab, views, nav.
+ *  23. C2 client price agreements: ClientPriceAgreement / AgreementLine /
+ *      DiscountRule declare their fields; AgreementLine links to both Offering
+ *      and PricePoint (inverses declared); OpportunityLine links to ArMandate
+ *      and TrainingRegistration; discount maths (standard price incl. the
+ *      AR + DPP bundle, rule precedence, value thresholds, approvers), quotes
+ *      from an agreement and from an opportunity, the preview overlay on
+ *      pricing.json, mandate → offerings → opportunity lines (idempotent);
+ *      views, record page tabs, Pricing folder nav, functions, ops scripts.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -91,6 +99,7 @@ const EXPECTED_OBJECTS = [
   'TrainingRegistration',
   'CustomerEvent', 'ResearchBrief', 'ResearchReport', 'ResearchFinding', 'Competitor', 'CompetitorPriceObservation',
   'StreamStage', 'OpportunityLine',
+  'ClientPriceAgreement', 'AgreementLine', 'DiscountRule',
 ];
 
 const failures = [];
@@ -379,8 +388,8 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   // Object structure, from the source: every plan field is declared, by name.
   const PLAN_FIELDS = {
-    'src/objects/offering.object.ts': ['name', 'offeringCode', 'productCategory', 'strategyType', 'displayFormat', 'fromPrefix', 'hasOptionalExtras', 'isActive', 'description', 'features', 'validFrom', 'validUntil', 'sortOrder', /* relation inverses: */ 'pricePoints', 'bundleItems', 'componentOf', 'competitorObservations', 'opportunityLines'],
-    'src/objects/price-point.object.ts': ['name', 'correlationId', 'offering', 'tier', 'annualFeeEur', 'setupFeeEur', 'currencyCode', 'isHighlighted', 'isOnRequest', 'isLegacy', 'sortOrder', 'description'],
+    'src/objects/offering.object.ts': ['name', 'offeringCode', 'productCategory', 'strategyType', 'displayFormat', 'fromPrefix', 'hasOptionalExtras', 'isActive', 'description', 'features', 'validFrom', 'validUntil', 'sortOrder', /* relation inverses: */ 'pricePoints', 'bundleItems', 'componentOf', 'competitorObservations', 'opportunityLines', 'agreementLines', 'discountRules'],
+    'src/objects/price-point.object.ts': ['name', 'correlationId', 'offering', 'tier', 'annualFeeEur', 'setupFeeEur', 'currencyCode', 'isHighlighted', 'isOnRequest', 'isLegacy', 'sortOrder', 'description', /* relation inverse: */ 'agreementLines'],
     'src/objects/bundle-item.object.ts': ['name', 'bundle', 'component', 'included', 'sortOrder'],
     'src/objects/pricing-publication.object.ts': ['name', 'publishedAt', 'version', 'publishedBy', 'commitSha', 'isLive', 'notes'],
   };
@@ -1233,6 +1242,208 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`B2 stream pipeline: ${problems.join('; ')}`);
   else ok('B2 stream pipeline: StreamStage + OpportunityLine linked both ways to ProductStream / Opportunity / Offering; 5 standard stages seeded per stream; KPI maths (weighted value, open opps, by stage, this quarter); Pipeline tab, 2 tables, 2 layouts, nav');
+}
+
+// ------------------------------------------- 23. C2 client price agreements
+{
+  const problems = [];
+  const a = await import(pathToFileURL(join(ROOT, 'shared/agreement-pricing.mjs')).href);
+  const p = await import(pathToFileURL(join(ROOT, 'shared/public-pricing.mjs')).href);
+  const fieldNames = (file) => [...stripComments(read(file)).matchAll(/\bname: '([A-Za-z]+)',\s*\n\s*label:/g)].map((m) => m[1]);
+  const exact = (file, names) => {
+    const declared = fieldNames(file);
+    const missing = names.filter((n) => !declared.includes(n));
+    const extra = declared.filter((n) => !names.includes(n));
+    if (missing.length || extra.length) problems.push(`${file}: fields missing [${missing}] extra [${extra}]`);
+  };
+  const same = (got, want, what) => JSON.stringify(got) === JSON.stringify(want) || problems.push(`${what}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+
+  // Objects: the plan's fields (createdBy is Twenty's system field, so the staff member is preparedBy).
+  exact('src/objects/client-price-agreement.object.ts', ['name', 'agreementCode', 'client', 'contact', 'opportunity', 'status', 'agreementType', 'startDate', 'endDate', 'signedAt', 'signedBy', 'preparedBy', 'notes', 'lines']);
+  exact('src/objects/agreement-line.object.ts', ['name', 'agreement', 'offering', 'pricePoint', 'agreedPriceEur', 'discountPercent', 'discountRationale', 'quantity', 'effectiveFrom', 'effectiveUntil']);
+  exact('src/objects/discount-rule.object.ts', ['name', 'offering', 'maxDiscountPercent', 'approver', 'minAgreementValueEur', 'isActive']);
+  const opportunityLineFields = fieldNames('src/objects/opportunity-line.object.ts');
+  for (const f of ['arMandate', 'trainingRegistration']) if (!opportunityLineFields.includes(f)) problems.push(`OpportunityLine lacks ${f}`);
+  const cpa = read('src/objects/client-price-agreement.object.ts');
+  if (!/uniqueText\(\{\s*universalIdentifier: F\.agreementCode/.test(cpa)) problems.push('clientPriceAgreement.agreementCode must be uniqueText');
+  if (!/options: AGREEMENT_STATUS,\s*\n\s*defaultValue: 'DRAFT'/.test(cpa)) problems.push("clientPriceAgreement.status must use AGREEMENT_STATUS, default 'DRAFT'");
+  same(a.AGREEMENT_STATUSES.map((o) => o.value), ['DRAFT', 'PROPOSED', 'ACCEPTED', 'ACTIVE', 'EXPIRED', 'CANCELLED'], 'agreement statuses');
+  same(a.AGREEMENT_TYPES.map((o) => o.value), ['STANDARD_PRICING', 'CUSTOM_PRICING', 'VOLUME_DISCOUNT', 'TRAINING_BUNDLE', 'MANDATE'], 'agreement types');
+  if (!a.AGREEMENT_CODE_PATTERN.test('CPA-2026-001') || a.AGREEMENT_CODE_PATTERN.test('CPA-26-1')) problems.push('AGREEMENT_CODE_PATTERN must accept CPA-2026-001 only');
+  for (const file of ['client-price-agreement', 'agreement-line', 'discount-rule']) {
+    if (/\bname: '(currency|type|createdBy)'/.test(read(`src/objects/${file}.object.ts`))) problems.push(`${file}: uses a name Twenty reserves (currency / type / createdBy)`);
+  }
+  const rule = read('src/objects/discount-rule.object.ts');
+  if (!/boolean\(\{\s*universalIdentifier: F\.isActive[\s\S]*?defaultValue: true/.test(rule)) problems.push('discountRule.isActive must be a checkbox defaulting to true');
+  for (const f of ['maxDiscountPercent', 'minAgreementValueEur']) if (!new RegExp(`number\\(\\{\\s*universalIdentifier: F\\.${f}`).test(rule)) problems.push(`discountRule.${f} must be a number`);
+
+  // Relations, linked both ways: [file, needle, what].
+  const linked = [
+    ['src/objects/agreement-line.object.ts', 'IDS.offering.fields.agreementLines', 'agreementLine.offering → offering.agreementLines'],
+    ['src/objects/offering.object.ts', 'IDS.agreementLine.fields.offering', 'offering.agreementLines ← agreementLine.offering'],
+    ['src/objects/agreement-line.object.ts', 'IDS.pricePoint.fields.agreementLines', 'agreementLine.pricePoint → pricePoint.agreementLines'],
+    ['src/objects/price-point.object.ts', 'IDS.agreementLine.fields.pricePoint', 'pricePoint.agreementLines ← agreementLine.pricePoint'],
+    ['src/objects/agreement-line.object.ts', 'IDS.clientPriceAgreement.fields.lines', 'agreementLine.agreement → clientPriceAgreement.lines'],
+    ['src/objects/client-price-agreement.object.ts', 'IDS.agreementLine.fields.agreement', 'clientPriceAgreement.lines ← agreementLine.agreement'],
+    ['src/objects/client-price-agreement.object.ts', 'IDS.company.fields.clientPriceAgreements', 'clientPriceAgreement.client → company.clientPriceAgreements'],
+    ['src/objects/company/client-price-agreements.field.ts', 'IDS.clientPriceAgreement.fields.client', 'company.clientPriceAgreements ← clientPriceAgreement.client'],
+    ['src/objects/client-price-agreement.object.ts', 'IDS.person.fields.clientPriceAgreements', 'clientPriceAgreement.contact → person.clientPriceAgreements'],
+    ['src/objects/person/client-price-agreements.field.ts', 'IDS.clientPriceAgreement.fields.contact', 'person.clientPriceAgreements ← clientPriceAgreement.contact'],
+    ['src/objects/person/signed-client-price-agreements.field.ts', 'IDS.clientPriceAgreement.fields.signedBy', 'person.signedClientPriceAgreements ← clientPriceAgreement.signedBy'],
+    ['src/objects/opportunity/client-price-agreements.field.ts', 'IDS.clientPriceAgreement.fields.opportunity', 'opportunity.clientPriceAgreements ← clientPriceAgreement.opportunity'],
+    ['src/objects/workspace-member/prepared-client-price-agreements.field.ts', 'IDS.clientPriceAgreement.fields.preparedBy', 'workspaceMember ← clientPriceAgreement.preparedBy'],
+    ['src/objects/discount-rule.object.ts', 'IDS.offering.fields.discountRules', 'discountRule.offering → offering.discountRules'],
+    ['src/objects/offering.object.ts', 'IDS.discountRule.fields.offering', 'offering.discountRules ← discountRule.offering'],
+    ['src/objects/discount-rule.object.ts', 'STANDARD.workspaceMember.object', 'discountRule.approver → WorkspaceMember'],
+    ['src/objects/workspace-member/discount-rules-to-approve.field.ts', 'IDS.discountRule.fields.approver', 'workspaceMember.discountRulesToApprove ← discountRule.approver'],
+    ['src/objects/opportunity-line.object.ts', 'IDS.arMandate.fields.opportunityLines', 'opportunityLine.arMandate → arMandate.opportunityLines'],
+    ['src/objects/ar-mandate.object.ts', 'IDS.opportunityLine.fields.arMandate', 'arMandate.opportunityLines ← opportunityLine.arMandate'],
+    ['src/objects/opportunity-line.object.ts', 'IDS.trainingRegistration.fields.opportunityLines', 'opportunityLine.trainingRegistration → trainingRegistration.opportunityLines'],
+    ['src/objects/training-registration.object.ts', 'IDS.opportunityLine.fields.trainingRegistration', 'trainingRegistration.opportunityLines ← opportunityLine.trainingRegistration'],
+  ];
+  for (const [file, needle, what] of linked) if (!existsSync(join(ROOT, file)) || !read(file).includes(needle)) problems.push(`relation not linked: ${what}`);
+
+  // The seed as REST records: offerings `o-<code>`, price points `p-<correlationId>`.
+  const offerings = p.OFFERINGS.map((o) => ({ ...o, id: `o-${o.offeringCode}` }));
+  const pricePoints = p.OFFERINGS.flatMap((o) => o.pricePoints.map((pp) => ({ ...pp, id: `p-${pp.correlationId}`, offeringId: `o-${o.offeringCode}` })));
+  const bundleItems = p.BUNDLE_ITEMS.map((b, i) => ({ id: `b${i}`, bundleId: `o-${b.bundle}`, componentId: `o-${b.component}`, included: b.included, sortOrder: b.sortOrder }));
+  const records = { offerings, pricePoints, bundleItems };
+  const line = (name, code, correlationId, extra = {}) => ({ id: name, name, offeringId: `o-${code}`, pricePointId: correlationId ? `p-${correlationId}` : null, ...extra });
+  const members = [{ id: 'm1', name: { firstName: 'Ada', lastName: 'Lovelace' } }, { id: 'm2', name: { firstName: 'Grace', lastName: 'Hopper' } }];
+  const global10 = { id: 'r1', name: 'Global 10%', offeringId: null, maxDiscountPercent: 10, approverId: 'm1', minAgreementValueEur: null, isActive: true };
+  const validate = (lines, rules) => a.validateAgreementDiscounts({ ...records, lines, rules, members });
+
+  // Discount vs the list price, over the global rule.
+  let v = validate([line('AR', 'AR', 'ar-beginner-2026', { agreedPriceEur: 200 }), line('EPREL', 'EPREL_REGISTRATION', null, { agreedPriceEur: 475 })], [global10]);
+  same(v.violations.map((x) => [x.lineName, x.maxAllowedPercent, x.actualPercent, x.requiresApprover]), [['AR', 10, 20, 'Ada Lovelace']], 'AR at 200 of 250 breaks the 10% rule; EPREL (single price point, 5%) does not');
+  same([v.requiresApproval, v.agreementValueEur], [true, 675], 'requiresApproval + agreement value');
+  // AR + DPP at the bundle price: 15% off list is the standard price, so no approval.
+  v = validate([line('AR', 'AR', 'ar-boost-2026', { agreedPriceEur: 1020 }), line('DPP', 'DPP_SUBSCRIPTION', 'dpp-boost-2026', { agreedPriceEur: 2125 })], [global10]);
+  same([v.requiresApproval, v.lines.map((l) => [l.bundleDiscountPercent, l.standardPriceEur, l.discountPercent, l.listDiscountPercent])], [false, [[15, 1020, 0, 15], [15, 2125, 0, 15]]], 'AR + DPP bundle −15% is standard pricing');
+  // A further 10% on top of the bundle is still within 10%; 12% is not.
+  v = validate([line('AR', 'AR', 'ar-boost-2026', { discountPercent: 12 }), line('DPP', 'DPP_SUBSCRIPTION', 'dpp-boost-2026', { discountPercent: 10 })], [global10]);
+  same(v.violations.map((x) => [x.lineName, x.actualPercent]), [['AR', 12]], 'stored discountPercent applies on top of the bundle price');
+  same(v.lines[0].agreedPriceEur, 897.6, 'AR Boost agreed = 1200 × 0.85 × 0.88');
+  // The offering's own rule beats the global one; inactive rules are ignored.
+  const ar25 = { id: 'r2', name: 'AR 25%', offeringId: 'o-AR', maxDiscountPercent: 25, approverId: 'm2', minAgreementValueEur: null, isActive: true };
+  const inactive0 = { id: 'r3', name: 'Off', offeringId: null, maxDiscountPercent: 0, approverId: 'm2', minAgreementValueEur: null, isActive: false };
+  v = validate([line('AR', 'AR', 'ar-beginner-2026', { agreedPriceEur: 200 }), line('EPREL', 'EPREL_REGISTRATION', null, { agreedPriceEur: 400 })], [global10, ar25, inactive0]);
+  same(v.violations.map((x) => [x.lineName, x.ruleName, x.requiresApprover]), [['EPREL', 'Global 10%', 'Ada Lovelace']], 'offering rule beats global; inactive rule ignored');
+  // Value thresholds: big agreements fall under the more generous rule.
+  const big30 = { id: 'r4', name: 'Big deals 30%', offeringId: null, maxDiscountPercent: 30, approverId: 'm2', minAgreementValueEur: 2000, isActive: true };
+  const seats = (quantity) => [line('Seats', 'TRAINING_LIVE', 'training-live-2026', { agreedPriceEur: 120, quantity })];
+  same(validate(seats(5), [global10, big30]).violations.map((x) => x.ruleName), ['Global 10%'], '5 seats (€600) → the 10% rule');
+  same(validate(seats(20), [global10, big30]).violations, [], '20 seats (€2400) → the 30% rule allows 20%');
+  same(validate(seats(20), [global10, big30]).agreementValueEur, 2400, 'agreement value = agreed × quantity');
+  // No rule: unrestricted. A price point of another offering: a problem.
+  same(validate(seats(1), []).requiresApproval, false, 'no rule → no approval');
+  v = validate([line('Wrong', 'AR', 'dpp-beginner-2026', { agreedPriceEur: 100 })], [global10]);
+  if (!v.problems.some((x) => /another offering/.test(x.problem))) problems.push('a price point of another offering must be reported');
+  if (!v.unchecked.length) problems.push('a line without a usable list price or stored discount must be unchecked');
+  same(a.governingRule([global10, big30, ar25], 'o-AR', 5000)?.id, 'r2', 'governingRule: offering rule first even below a bigger global');
+  same(a.discountPercent(250, 300), -20, 'a price above list is a negative discount');
+
+  // Quote from an opportunity: Boost tier, bundle, a per-seat line, an on-request line, a line without offering.
+  const opportunityLines = [
+    { id: 'l1', name: 'AR', offeringId: 'o-AR', isActive: true },
+    { id: 'l2', name: 'DPP', offeringId: 'o-DPP_SUBSCRIPTION', isActive: true },
+    { id: 'l3', name: 'Training', offeringId: 'o-TRAINING_LIVE', isActive: true },
+    { id: 'l4', name: 'Boss', offeringId: 'o-BOSS', isActive: true },
+    { id: 'l5', name: 'Old', offeringId: 'o-EPREL_REGISTRATION', isActive: false },
+    { id: 'l6', name: 'Unpriced', offeringId: null, isActive: true },
+  ];
+  const now = new Date('2026-10-04T12:00:00Z');
+  let q = a.quoteFromOpportunity({ opportunity: { id: 'opp-1', name: 'Acme 2027', tier: 'BOOST' }, opportunityLines, ...records, company: { id: 'c1', name: 'Acme', tier: 'BEGINNER' } }, { now });
+  same(q.lines.map((l) => [l.offeringCode, l.unitPriceEur, l.discountPercent, l.unit, l.isOnRequest]), [['AR', 1020, 15, 'year', false], ['DPP_SUBSCRIPTION', 2125, 15, 'year', false], ['TRAINING_LIVE', 150, 0, 'seat', false], ['BOSS', null, 0, 'year', true]], 'opportunity quote lines (Boost, bundle, per seat, on request)');
+  same(q.totals, { listEur: 3850, discountEur: 555, netEur: 3295, setupFeesEur: 0, totalEur: 3295, hasOnRequestItems: true }, 'opportunity quote totals');
+  same([q.tier, q.bundles, q.validUntil, q.warnings.length], ['BOOST', [{ offeringCode: 'AR_DPP_BUNDLE', components: ['AR', 'DPP_SUBSCRIPTION'], discountPercent: 15 }], '2026-11-03', 1], 'opportunity quote tier / bundles / validity / warnings');
+  q = a.quoteFromOpportunity({ opportunity: { id: 'opp-2' }, opportunityLines: opportunityLines.slice(0, 1), ...records, company: { id: 'c1', tier: 'BUILDER' } }, { now });
+  same([q.tier, q.lines[0].unitPriceEur, q.lines[0].discountPercent], ['BUILDER', 3000, 0], "no opportunity tier → the company's; AR alone has no bundle");
+  // Quote from an agreement: as agreed, ended lines left out, valid to the end date.
+  q = a.quoteFromAgreement({
+    agreement: { id: 'cpa-1', name: 'Acme', agreementCode: 'CPA-2026-001', agreementType: 'VOLUME_DISCOUNT', status: 'ACTIVE', endDate: '2027-09-30' },
+    lines: [...seats(20), line('Old', 'EPREL_REGISTRATION', null, { agreedPriceEur: 1, effectiveUntil: '2026-01-31' }), line('Boss', 'BOSS', 'boss-2026', { agreedPriceEur: 9000, discountRationale: 'Custom scope' })],
+    ...records,
+  }, { now });
+  same([q.quoteNumber, q.validUntil, q.lines.map((l) => [l.name, l.quantity, l.unitPriceEur, l.lineTotalEur, l.discountPercent]), q.totals.totalEur, q.totals.hasOnRequestItems], ['Q-CPA-2026-001-20261004', '2027-09-30', [['Seats', 20, 120, 2400, 20], ['Boss', 1, 9000, 9000, 0]], 11400, false], 'agreement quote');
+
+  // Preview: the agreement's prices over the published pricing.json.
+  const published = p.buildPublicPricing(records, { now, version: '2026-10-04.1' });
+  const preview = a.applyAgreementToPricing(published, {
+    agreement: { id: 'cpa-1', agreementCode: 'CPA-2026-001' },
+    lines: [
+      line('AR Beginner', 'AR', 'ar-beginner-2026', { agreedPriceEur: 200 }),
+      line('DPP −10%', 'DPP_SUBSCRIPTION', null, { discountPercent: 10 }),
+      line('Future', 'EPREL_REGISTRATION', null, { agreedPriceEur: 1, effectiveFrom: '2027-01-01' }),
+      line('Ghost', 'NOPE', null, { agreedPriceEur: 1 }),
+    ],
+    offerings,
+    pricePoints,
+  }, { now });
+  const fee = (code, cid) => preview.pricing.offerings.find((o) => o.offeringCode === code).pricePoints.find((x) => x.correlationId === cid).annualFeeEur;
+  same([fee('AR', 'ar-beginner-2026'), fee('AR', 'ar-boost-2026'), fee('DPP_SUBSCRIPTION', 'dpp-beginner-2026'), fee('DPP_SUBSCRIPTION', 'dpp-builder-2026'), fee('DPP_SUBSCRIPTION', 'dpp-boss-2026'), fee('EPREL_REGISTRATION', 'eprel-registration-2026')], [200, 1200, 855, 5400, null, 500], 'preview fees');
+  same([preview.pricing.version, preview.applied.length, preview.skipped.map((x) => x.lineName)], ['2026-10-04.1+CPA-2026-001', 4, ['DPP −10%', 'Future', 'Ghost']], 'preview version / applied / skipped (dpp-boss on request, future line, unknown offering)');
+  if (!p.PublicPricingV1.safeParse(preview.pricing).success) problems.push('the preview must pass PublicPricingV1');
+  if (published.offerings.find((o) => o.offeringCode === 'AR').pricePoints[0].annualFeeEur !== 250) problems.push('applyAgreementToPricing must not mutate its input');
+  same([a.previewBranch('CPA-2026-001'), a.previewBranch(' CPA 2026/001.. ')], ['pricing-preview/CPA-2026-001', 'pricing-preview/CPA-2026-001'], 'preview branch names');
+
+  // Mandate → offerings → opportunity lines.
+  same(a.mandateOfferings([{ category: 'BATTERY_LMT', dppStatus: 'DRAFT' }]).map((x) => x.offeringCode), ['AR', 'DPP_SUBSCRIPTION', 'BATTERY_PASSPORT'], 'battery product with a DPP → AR + DPP + battery passport');
+  same(a.mandateOfferings([{ category: 'TEXTILES', dppStatus: 'PUBLISHED' }, { category: 'BATTERY_LI_ION', dppStatus: 'NONE' }]).map((x) => x.offeringCode), ['AR', 'DPP_SUBSCRIPTION'], 'DPP on textiles, battery without DPP → AR + DPP');
+  same(a.mandateOfferings([]).map((x) => x.offeringCode), ['AR'], 'no products → AR');
+  same([a.mandateFeeEur({ annualFee: { amountMicros: '300000000', currencyCode: 'EUR' } }), a.mandateFeeEur({ annualFee: { amountMicros: 1e8, currencyCode: 'USD' } }), a.mandateFeeEur({ annualFee: { amountMicros: null } })], [300, null, null], 'mandate fee from micros');
+  const mandate = { id: 'man-1', name: 'Acme AR 2027', annualFee: { amountMicros: 300_000_000, currencyCode: 'EUR' } };
+  const products = [{ category: 'BATTERY_LMT', dppStatus: 'DRAFT' }];
+  const planArgs = { mandate, products, opportunityId: 'opp-1', offerings, pricePoints, bundleItems, tier: 'BUILDER', streamId: 's-lmt', today: '2026-10-04' };
+  let plan = a.planMandateLines({ ...planArgs, existingLines: [{ id: 'ol-dpp', opportunityId: 'opp-1', offeringId: 'o-DPP_SUBSCRIPTION', arMandateId: null, estimatedValueEur: 5000, streamId: 's-lmt' }] });
+  same(plan.create.map((c) => [c.offeringCode, c.estimatedValueEur, c.priceSource, c.data.arMandateId, c.data.streamId]), [['AR', 300, 'mandate fee', 'man-1', 's-lmt'], ['BATTERY_PASSPORT', 1500, 'price list', 'man-1', 's-lmt']], 'mandate plan creates AR (mandate fee) + battery passport');
+  same(plan.update.map((u) => [u.id, u.patch]), [['ol-dpp', { arMandateId: 'man-1', estimatedValueEur: 5100 }]], 'mandate plan links the existing DPP line at Builder less 15%');
+  const after = [...plan.create.map((c, i) => ({ id: `new-${i}`, ...c.data })), { id: 'ol-dpp', opportunityId: 'opp-1', offeringId: 'o-DPP_SUBSCRIPTION', arMandateId: 'man-1', estimatedValueEur: 5100, streamId: 's-lmt' }];
+  plan = a.planMandateLines({ ...planArgs, existingLines: after });
+  same([plan.create.length, plan.update.length, plan.unchanged.length], [0, 0, 3], 'a second mandate run writes nothing');
+  plan = a.planMandateLines({ ...planArgs, existingLines: after, agreementLines: [{ offeringId: 'o-BATTERY_PASSPORT', agreedPriceEur: 1200, quantity: 1, effectiveFrom: '2026-01-01' }] });
+  same(plan.update.map((u) => [u.offeringCode, u.patch, u.priceSource]), [['BATTERY_PASSPORT', { estimatedValueEur: 1200 }, 'price agreement']], 'a binding agreement line prices the mandate line');
+  same(a.planMandateLines({ ...planArgs, offerings: offerings.filter((o) => o.offeringCode !== 'BATTERY_PASSPORT'), existingLines: [] }).skipped.map((x) => x.offeringCode), ['BATTERY_PASSPORT'], 'a missing offering is skipped');
+  same([
+    a.pickOpportunity({ requestedId: 'x' }),
+    a.pickOpportunity({ mandateLines: [{ opportunityId: 'o1' }, { opportunityId: 'o1' }] }),
+    a.pickOpportunity({ mandateLines: [{ opportunityId: 'o1' }, { opportunityId: 'o2' }] }).error,
+    a.pickOpportunity({ companyOpportunities: [{ id: 'o1', stage: 'LOST' }, { id: 'o2', stage: 'TRIAL' }], closedStages: ['LOST'] }),
+    a.pickOpportunity({ companyOpportunities: [] }).error,
+  ], [{ opportunityId: 'x' }, { opportunityId: 'o1' }, 'ambiguous_opportunity', { opportunityId: 'o2' }, 'opportunity_not_found'], 'pickOpportunity');
+
+  // Functions, scripts, views, layout, nav.
+  for (const f of ['src/functions/validate-agreement-discounts.ts', 'src/functions/link-mandate-pricing.ts', 'ops/build-quote.mjs', 'ops/trigger-preview.mjs', 'src/front-components/ValidateDiscountsButton.tsx']) if (!existsSync(join(ROOT, f))) problems.push(`${f} is missing`);
+  const validator = read('src/functions/validate-agreement-discounts.ts');
+  if (!validator.includes('validateAgreementDiscounts(') || /\b(createRecord|updateRecord)\b/.test(validator)) problems.push('validate-agreement-discounts must use validateAgreementDiscounts and write nothing (its token sits in the browser)');
+  if (!read('src/functions/link-mandate-pricing.ts').includes('planMandateLines(')) problems.push('link-mandate-pricing must plan with planMandateLines');
+  const previewSrc = read('ops/trigger-preview.mjs');
+  const dryReturn = previewSrc.indexOf('if (dryRun) {');
+  if (dryReturn < 0 || previewSrc.indexOf('await commitPreview(') < dryReturn || !/const gh = dryRun \? null : githubFromEnv\(\)/.test(previewSrc)) problems.push('trigger-preview --dry-run must return before any GitHub call');
+  if (!read('ops/build-quote.mjs').includes('quoteFromOpportunity(') || !read('ops/build-quote.mjs').includes('quoteFromAgreement(')) problems.push('build-quote must quote agreements and opportunities');
+  const views = {
+    'client-price-agreements-table': ['A', ['agreementCode', 'client', 'status', 'agreementType', 'startDate']],
+    'agreement-lines-table': ['L', ['agreement', 'offering', 'pricePoint', 'agreedPriceEur', 'discountPercent']],
+    'discount-rules-table': ['R', ['name', 'offering', 'maxDiscountPercent', 'approver']],
+  };
+  for (const [file, [alias, cols]] of Object.entries(views)) {
+    const src = read(`src/views/${file}.view.ts`);
+    if (!/type: ViewType\.TABLE,/.test(src)) problems.push(`${file} must be a TABLE view`);
+    for (const c of cols) if (!src.includes(`[${alias}.${c},`)) problems.push(`${file} lacks ${c}`);
+  }
+  if (!/type: ViewType\.TABLE_WIDGET/.test(read('src/views/client-price-agreement-lines.view.ts'))) problems.push('client-price-agreement-lines must be a TABLE_WIDGET view');
+  const layout = read('src/page-layouts/client-price-agreement-record.page-layout.ts');
+  for (const tab of ["'Overview'", "'Lines'", "'Validation'"]) if (!layout.includes(`title: ${tab}`)) problems.push(`client price agreement page lacks the ${tab} tab`);
+  if (!layout.includes('IDS.frontComponents.validateDiscountsButton') || !layout.includes('IDS.views.clientPriceAgreementLinesWidget.view')) problems.push('client price agreement page needs the lines table and the validate button');
+  if (!/type: NavigationMenuItemType\.FOLDER/.test(read('src/navigation/pricing-folder.nav.ts'))) problems.push('pricing-folder.nav.ts must be a FOLDER');
+  for (const [file, view] of [['pricing', 'offeringsTable'], ['client-price-agreements', 'clientPriceAgreementsTable'], ['discount-rules', 'discountRulesTable']]) {
+    const src = read(`src/navigation/${file}.nav.ts`);
+    if (!src.includes(`IDS.views.${view}.view`) || !src.includes('folderUniversalIdentifier: IDS.navigation.pricingFolder')) problems.push(`${file}.nav.ts must open ${view} inside the Pricing folder`);
+  }
+  if (!read('src/index.ts').includes('DISCOUNT_CHECK_TOKEN')) problems.push('src/index.ts must declare the DISCOUNT_CHECK_TOKEN app variable');
+
+  if (problems.length) fail(`C2 client price agreements: ${problems.join('; ')}`);
+  else ok('C2 client price agreements: ClientPriceAgreement / AgreementLine / DiscountRule fields + 21 relations linked both ways (AgreementLine → Offering + PricePoint, OpportunityLine → ArMandate + TrainingRegistration); discount maths (bundle = standard, rule precedence, value thresholds, approvers); opportunity + agreement quotes; preview overlay on pricing.json; mandate → offerings → lines, idempotent; views, 3-tab layout, Pricing folder nav');
 }
 
 // ----------------------------------------------------------------- report

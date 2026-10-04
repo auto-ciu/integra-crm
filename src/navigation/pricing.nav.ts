@@ -1,6 +1,6 @@
 /**
- * Sidebar: "Pricing" — a VIEW item (not OBJECT) so the label is "Pricing"
- * rather than the object's plural "Offerings". Under Product Streams.
+ * Sidebar: Pricing › Offerings — a VIEW item (not OBJECT) opening the
+ * Offerings table, first in the Pricing folder (pricing-folder.nav.ts).
  */
 import { defineNavigationMenuItem, NavigationMenuItemType } from '../lib/sdk';
 import { IDS } from '../ids';
@@ -8,8 +8,9 @@ import { IDS } from '../ids';
 export default defineNavigationMenuItem({
   universalIdentifier: IDS.navigation.pricing,
   type: NavigationMenuItemType.VIEW,
-  name: 'Pricing',
+  name: 'Offerings',
   icon: 'IconReceipt2',
   viewUniversalIdentifier: IDS.views.offeringsTable.view,
-  position: 6,
+  folderUniversalIdentifier: IDS.navigation.pricingFolder,
+  position: 0,
 });

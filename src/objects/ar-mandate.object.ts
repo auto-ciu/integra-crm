@@ -108,5 +108,14 @@ export default defineObject({
       targetObjectId: IDS.mandateProduct.object,
       inverseFieldId: IDS.mandateProduct.fields.arMandate,
     }),
+    oneToMany({
+      universalIdentifier: F.opportunityLines,
+      name: 'opportunityLines',
+      label: 'Opportunity lines · 商机明细',
+      icon: 'IconListDetails',
+      description: 'Pipeline lines pricing this mandate (link-mandate-pricing)',
+      targetObjectId: IDS.opportunityLine.object,
+      inverseFieldId: IDS.opportunityLine.fields.arMandate,
+    }),
   ],
 });
