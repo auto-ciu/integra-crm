@@ -7,9 +7,13 @@
  * acknowledgement, so it is the label identifier. `intakeId` is the form's
  * client-generated UUID: intake looks it up first so a retried POST never
  * creates a second ticket.
+ *
+ * E3 adds the Zendesk-style fields: assignee, tags, SLA clock, activity
+ * timestamps, resolution, satisfaction and staff-only notes. Status keeps its
+ * E1 values; the E3 plan's ASSIGNED / WAITING map to OPEN / PENDING.
  */
 import { defineObject } from '../lib/sdk';
-import { dateTime, manyToOne, oneToMany, richText, select, text, uniqueText } from '../lib/fields';
+import { dateTime, link, manyToOne, oneToMany, richText, select, text, uniqueText } from '../lib/fields';
 import { IDS } from '../ids';
 import { STANDARD } from '../standard-ids';
 import {
@@ -19,6 +23,7 @@ import {
   ENQUIRY_SOURCE,
   ENQUIRY_STATUS,
   SPAM_CHECK,
+  TICKET_SATISFACTION,
 } from '../options';
 
 const F = IDS.enquiry.fields;
@@ -160,6 +165,72 @@ export default defineObject({
       targetObjectId: STANDARD.opportunity.object,
       inverseFieldId: IDS.opportunity.fields.enquiries,
       description: 'Set by Promote to lead',
+    }),
+    manyToOne({
+      universalIdentifier: F.assignedTo,
+      name: 'assignedTo',
+      label: 'Assigned to · 负责人',
+      icon: 'IconUserCircle',
+      targetObjectId: STANDARD.workspaceMember.object,
+      inverseFieldId: IDS.workspaceMember.fields.assignedEnquiries,
+    }),
+    text({
+      universalIdentifier: F.tags,
+      name: 'tags',
+      label: 'Tags · 标签',
+      icon: 'IconTags',
+      description: 'Comma-separated, e.g. "dpp,urgent,canton-fair"',
+    }),
+    dateTime({
+      universalIdentifier: F.slaTarget,
+      name: 'slaTarget',
+      relative: true,
+      label: 'SLA target · 响应期限',
+      icon: 'IconClockExclamation',
+      description: 'When this must be responded to by (from the SLA policy for its priority)',
+    }),
+    dateTime({
+      universalIdentifier: F.firstResponseAt,
+      name: 'firstResponseAt',
+      label: 'First response at · 首次回复',
+      icon: 'IconClockCheck',
+    }),
+    dateTime({
+      universalIdentifier: F.lastActivityAt,
+      name: 'lastActivityAt',
+      relative: true,
+      label: 'Last activity · 最近活动',
+      icon: 'IconActivity',
+    }),
+    text({
+      universalIdentifier: F.resolution,
+      name: 'resolution',
+      label: 'Resolution · 处理结果',
+      icon: 'IconCircleCheck',
+      description: 'How it was resolved (summary)',
+    }),
+    select({
+      universalIdentifier: F.satisfaction,
+      name: 'satisfaction',
+      label: 'Satisfaction · 满意度',
+      icon: 'IconMoodSmile',
+      options: TICKET_SATISFACTION,
+      defaultValue: 'NONE',
+      description: 'Post-resolution feedback',
+    }),
+    link({
+      universalIdentifier: F.sourceUrl,
+      name: 'sourceUrl',
+      label: 'Source URL · 来源链接',
+      icon: 'IconLink',
+      description: 'Where the enquiry came from, e.g. the website page',
+    }),
+    richText({
+      universalIdentifier: F.internalNotes,
+      name: 'internalNotes',
+      label: 'Internal notes · 内部备注',
+      icon: 'IconLock',
+      description: 'Staff-only notes',
     }),
     oneToMany({
       universalIdentifier: F.messages,

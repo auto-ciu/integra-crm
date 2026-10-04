@@ -45,6 +45,8 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── shared/stages.mjs                the six pipeline stages (views + ops + verify read this)
 ├── shared/urgency.mjs               renewal maths shared by widgets and renewals-check (planMandate)
 ├── shared/reply-templates.mjs       E2: the ten seed templates, template choice (fallback order) and rendering
+├── shared/sla.mjs                   E3: default SLA policies, SLA target, e-mail sender / threading / routing helpers
+├── shared/ticket-macros.mjs         E3: the eight EN/ZH seed macros and macro rendering
 ├── shared/digest.mjs                B2: digest model, prices and the $10/session cost cap
 ├── shared/icp.mjs                   freemail list + e-mail-domain → Company matching
 ├── shared/streams.mjs               the nine product streams, one per PRODUCT_CATEGORY (seed + verify read this)
@@ -60,6 +62,8 @@ installed on an unmodified Twenty **v2.41.0** — no fork, no vendoring.
 ├── ops/lib/sidecar.mjs              client for the ops-invoked sidecar functions (SIDECAR_URL, OPS_TOKEN)
 ├── ops/nightly-status.mjs           CLI over renewals-check: urgency/status recompute (idempotent, --dry-run)
 ├── ops/seed-reply-templates.mjs     creates missing ReplyTemplate records from shared/reply-templates.mjs (--dry-run)
+├── ops/seed-ticket-macros.mjs       creates missing TicketMacro records (E3, --dry-run)
+├── ops/seed-sla-policies.mjs        creates the four default SlaPolicy records (E3, --dry-run)
 ├── ops/generate-all-digests.mjs     B2: one AI digest per active ProductStream via generate-stream-digest (weekly, --dry-run)
 ├── ops/sync-opportunity-stages.mjs  replaces the stock stage options via /metadata
 ├── ops/seed-product-streams.mjs     creates missing ProductStream records from shared/streams.mjs (idempotent, --dry-run)
@@ -100,6 +104,7 @@ TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run streams:dry  # t
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:dry  # then pricing:seed
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run pricing:publish  # writes ./pricing.json
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run replies:dry  # then replies:seed
+TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run macros:dry   # then macros:seed, sla:dry, sla:seed
 TWENTY_API_URL=… TWENTY_API_KEY=… SIDECAR_URL=… OPS_TOKEN=… npm run digests:dry  # then digests (weekly cron)
 TWENTY_API_URL=http://localhost:3001 TWENTY_API_KEY=… npm run training:dry  # then training:seed
 TWENTY_API_URL=… TWENTY_API_KEY=… STRIPE_SECRET_KEY=sk_test_… npm run stripe:dry   # preview; then SIDECAR_URL=… OPS_TOKEN=… npm run stripe:sync

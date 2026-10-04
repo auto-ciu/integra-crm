@@ -1,9 +1,10 @@
 /**
- * Enquiry record page: Messages / Requester / Triage.
+ * Enquiry record page: Thread / Details / Macros (E3).
  *
- * Messages carries the PromoteToLeadButton above the conversation table.
- * Requester and Triage are FIELDS widgets, each scoped by its own
- * FIELDS_WIDGET view (views/enquiry-*-fields.view.ts). The FIELD widget's
+ * Thread carries the Assign-to-me / Resolve bar and the PromoteToLeadButton
+ * above the conversation table. Details stacks three FIELDS widgets (ticket,
+ * requester, triage), each scoped by its own FIELDS_WIDGET view
+ * (views/enquiry-*-fields.view.ts). Macros is ApplyMacroPanel. The FIELD widget's
  * config takes a workspace `fieldMetadataId` that the SDK does not map from a
  * universal id, so it can't be used from an app manifest.
  */
@@ -29,11 +30,21 @@ export default definePageLayout({
   tabs: [
     {
       universalIdentifier: L.tabs.messages,
-      title: 'Messages',
+      title: 'Thread',
       icon: 'IconMessages',
       position: 0,
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
+        {
+          universalIdentifier: L.widgets.actionsBar,
+          title: 'Ticket actions',
+          type: WidgetType.FRONT_COMPONENT,
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier: IDS.frontComponents.enquiryActionsBar,
+          },
+          heightBehavior: FIT,
+        },
         {
           universalIdentifier: L.widgets.promoteToLead,
           title: 'Promote to lead',
@@ -58,12 +69,22 @@ export default definePageLayout({
       ],
     },
     {
-      universalIdentifier: L.tabs.requester,
-      title: 'Requester',
-      icon: 'IconUser',
+      universalIdentifier: L.tabs.details,
+      title: 'Details',
+      icon: 'IconListDetails',
       position: 1,
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
+        {
+          universalIdentifier: L.widgets.ticketFields,
+          title: 'Ticket',
+          type: WidgetType.FIELDS,
+          configuration: {
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier: IDS.views.enquiryTicketFields.view,
+          },
+          heightBehavior: FIT,
+        },
         {
           universalIdentifier: L.widgets.requesterFields,
           title: 'Requester',
@@ -74,15 +95,6 @@ export default definePageLayout({
           },
           heightBehavior: FIT,
         },
-      ],
-    },
-    {
-      universalIdentifier: L.tabs.triage,
-      title: 'Triage',
-      icon: 'IconStethoscope',
-      position: 2,
-      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
-      widgets: [
         {
           universalIdentifier: L.widgets.triageFields,
           title: 'Triage',
@@ -90,6 +102,25 @@ export default definePageLayout({
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier: IDS.views.enquiryTriageFields.view,
+          },
+          heightBehavior: FILL,
+        },
+      ],
+    },
+    {
+      universalIdentifier: L.tabs.macros,
+      title: 'Macros',
+      icon: 'IconBolt',
+      position: 2,
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier: L.widgets.applyMacro,
+          title: 'Macros',
+          type: WidgetType.FRONT_COMPONENT,
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier: IDS.frontComponents.applyMacroPanel,
           },
           heightBehavior: FILL,
         },

@@ -265,3 +265,161 @@ export async function fetchStreamLines(streamId: string): Promise<StreamLineReco
     stageOrder: stage?.order ?? null,
   }));
 }
+
+// ------------------------------------------------------ E3 ticket management
+
+const OPEN_STATUS_FILTER = { not: { status: { in: ['CLOSED', 'SPAM'] } } } as const;
+
+export type TicketStats = {
+  open: number;
+  mine: number;
+  overdue: number;
+  /** Mean hours from creation to first response over the last 30 days; null with no data. */
+  avgFirstResponseHours: number | null;
+  resolvedToday: number;
+};
+
+/** The signed-in user's workspace member id (assignedTo points at WorkspaceMember, not User). */
+export async function fetchWorkspaceMemberId(userId: string): Promise<string | null> {
+  const { workspaceMembers } = await new CoreApiClient().query({
+    workspaceMembers: {
+      __args: { filter: { userId: { eq: userId } }, first: 1 },
+      edges: { node: { id: true } },
+    },
+  });
+  return (workspaceMembers?.edges?.[0]?.node?.id as string | undefined) ?? null;
+}
+
+const count = async (filter: Record<string, unknown>): Promise<number> => {
+  const { enquiries } = await new CoreApiClient().query({
+    enquiries: { __args: { filter, first: 1 }, totalCount: true },
+  });
+  return (enquiries?.totalCount as number | undefined) ?? 0;
+};
+
+export async function fetchTicketStats(userId: string | null, now = new Date()): Promise<TicketStats> {
+  const memberId = userId ? await fetchWorkspaceMemberId(userId) : null;
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+  const since = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+
+  const [open, mine, overdue, resolvedToday, answered] = await Promise.all([
+    count(OPEN_STATUS_FILTER),
+    memberId ? count({ and: [OPEN_STATUS_FILTER, { assignedToId: { eq: memberId } }] }) : Promise.resolve(0),
+    count({ and: [OPEN_STATUS_FILTER, { slaTarget: { lt: now.toISOString() } }] }),
+    count({ and: [{ status: { eq: 'CLOSED' } }, { closedAt: { gte: startOfDay.toISOString() } }] }),
+    new CoreApiClient().query({
+      enquiries: {
+        __args: { filter: { and: [{ firstResponseAt: { is: 'NOT_NULL' } }, { createdAt: { gte: since } }] }, first: 200 },
+        edges: { node: { createdAt: true, firstResponseAt: true } },
+      },
+    }),
+  ]);
+
+  const waits = ((answered.enquiries?.edges ?? []) as Array<{ node: { createdAt: string; firstResponseAt: string } }>)
+    .map(({ node }) => (Date.parse(node.firstResponseAt) - Date.parse(node.createdAt)) / 3_600_000)
+    .filter((hours) => Number.isFinite(hours) && hours >= 0);
+  const avgFirstResponseHours = waits.length ? waits.reduce((a, b) => a + b, 0) / waits.length : null;
+
+  return { open, mine, overdue, avgFirstResponseHours, resolvedToday };
+}
+
+export type TicketForActions = {
+  id: string;
+  reference: string | null;
+  status: string | null;
+  category: string | null;
+  language: string | null;
+  firstResponseAt: string | null;
+  assignedToId: string | null;
+  person: { name: { firstName: string | null; lastName: string | null } | null; emails: { primaryEmail: string | null } | null } | null;
+  company: { name: string | null } | null;
+};
+
+export async function fetchTicket(recordId: string): Promise<TicketForActions | null> {
+  const { enquiry } = await new CoreApiClient().query({
+    enquiry: {
+      __args: { filter: { id: { eq: recordId } } },
+      id: true,
+      reference: true,
+      status: true,
+      category: true,
+      language: true,
+      firstResponseAt: true,
+      assignedToId: true,
+      relatedPerson: { name: { firstName: true, lastName: true }, emails: { primaryEmail: true } },
+      relatedCompany: { name: true },
+    },
+  });
+  if (!enquiry) return null;
+  const { relatedPerson, relatedCompany, ...rest } = enquiry as Record<string, unknown>;
+  return { ...rest, person: relatedPerson ?? null, company: relatedCompany ?? null } as TicketForActions;
+}
+
+async function updateEnquiry(id: string, data: Record<string, unknown>): Promise<void> {
+  await new CoreApiClient().mutation({ updateEnquiry: { __args: { id, data }, id: true } });
+}
+
+export const assignEnquiryToMe = async (enquiryId: string, userId: string) => {
+  const memberId = await fetchWorkspaceMemberId(userId);
+  if (!memberId) throw new Error('No workspace member for the signed-in user');
+  await updateEnquiry(enquiryId, { assignedToId: memberId, lastActivityAt: new Date().toISOString() });
+};
+
+/** Resolve = status CLOSED, closedAt now, resolution summary. */
+export const resolveEnquiry = (enquiryId: string, resolution: string) => {
+  const now = new Date().toISOString();
+  return updateEnquiry(enquiryId, { status: 'CLOSED', closedAt: now, resolution, lastActivityAt: now });
+};
+
+export type TicketMacroRecord = {
+  id: string;
+  name: string | null;
+  shortcut: string | null;
+  responseTemplate: { markdown: string | null } | null;
+  category: string | null;
+  appendSignature: boolean;
+  serviceInterest: string | null;
+  productCategory: string | null;
+};
+
+export async function fetchTicketMacros(): Promise<TicketMacroRecord[]> {
+  const { ticketMacros } = await new CoreApiClient().query({
+    ticketMacros: {
+      __args: { orderBy: [{ name: 'AscNullsLast' }], first: 200 },
+      edges: {
+        node: { id: true, name: true, shortcut: true, responseTemplate: { markdown: true }, category: true, appendSignature: true, serviceInterest: true, productCategory: true },
+      },
+    },
+  });
+  return ((ticketMacros?.edges ?? []) as Array<{ node: TicketMacroRecord }>).map((edge) => edge.node);
+}
+
+/**
+ * Record `markdown` as an OUTBOUND reply and move the ticket on: lastActivityAt,
+ * firstResponseAt (if still empty), and status PENDING (waiting on the client).
+ * Nothing is e-mailed: sending goes through SES, which is not wired yet, so
+ * sentAt stays empty exactly as for the E2 auto-reply.
+ */
+export async function recordOutboundReply(ticket: TicketForActions, macroName: string, markdown: string): Promise<void> {
+  const now = new Date().toISOString();
+  await new CoreApiClient().mutation({
+    createEnquiryMessage: {
+      __args: {
+        data: {
+          name: `${ticket.reference ?? 'Enquiry'} · outbound · ${macroName}`,
+          enquiryId: ticket.id,
+          direction: 'OUTBOUND',
+          body: { markdown, blocknote: null },
+          isAutoReply: false,
+        },
+      },
+      id: true,
+    },
+  });
+  await updateEnquiry(ticket.id, {
+    lastActivityAt: now,
+    ...(ticket.firstResponseAt ? {} : { firstResponseAt: now }),
+    ...(ticket.status === 'CLOSED' || ticket.status === 'SPAM' ? {} : { status: 'PENDING' }),
+  });
+}

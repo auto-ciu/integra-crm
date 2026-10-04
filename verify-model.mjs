@@ -75,6 +75,12 @@
  *      from an agreement and from an opportunity, the preview overlay on
  *      pricing.json, mandate → offerings → opportunity lines (idempotent);
  *      views, record page tabs, Pricing folder nav, functions, ops scripts.
+ *  23. E3 ticket management: Enquiry has the assignee / tags / SLA / activity /
+ *      resolution / satisfaction / sourceUrl / internalNotes fields, TicketMacro
+ *      and SlaPolicy declare the plan's fields, the inbox / my / overdue views
+ *      and the page-layout tabs exist, the SLA defaults are 1/4/8/24h, the
+ *      macros seed is EN + ZH, and email-to-ticket's helpers (sender parsing,
+ *      threading ids, routing, status after a reply) behave as specified.
  *
  * Exit 0 with a ✓ per check, or 1 listing every failure.
  */
@@ -94,7 +100,7 @@ const EXPECTED_OBJECTS = [
   'Enquiry', 'EnquiryMessage', 'EnquiryRoutingRule',
   'ProductStream', 'StreamUpdate', 'StreamDocument', 'StreamContact', 'FairLead',
   'Offering', 'PricePoint', 'BundleItem', 'PricingPublication',
-  'ReplyTemplate',
+  'ReplyTemplate', 'TicketMacro', 'SlaPolicy',
   'LeadDiscoveryRun', 'DiscoveredCompany', 'LeadImport',
   'TrainingRegistration',
   'CustomerEvent', 'ResearchBrief', 'ResearchReport', 'ResearchFinding', 'Competitor', 'CompetitorPriceObservation',
@@ -1444,6 +1450,105 @@ const DEFINE_CALL = /\b(define(?:Application|ApplicationRole|Object|Field|View|P
 
   if (problems.length) fail(`C2 client price agreements: ${problems.join('; ')}`);
   else ok('C2 client price agreements: ClientPriceAgreement / AgreementLine / DiscountRule fields + 21 relations linked both ways (AgreementLine → Offering + PricePoint, OpportunityLine → ArMandate + TrainingRegistration); discount maths (bundle = standard, rule precedence, value thresholds, approvers); opportunity + agreement quotes; preview overlay on pricing.json; mandate → offerings → lines, idempotent; views, 3-tab layout, Pricing folder nav');
+}
+// ------------------------------------------- 24. E3 ticket management
+{
+  const problems = [];
+  const declaredIn = (file) => [...stripComments(read(file)).matchAll(/\bname: '([A-Za-z]+)',\s*\n(?:\s*relative: true,\s*\n)?\s*label:/g)].map((m) => m[1]);
+
+  const enquiryFields = declaredIn('src/objects/enquiry.object.ts');
+  for (const f of ['assignedTo', 'priority', 'tags', 'slaTarget', 'firstResponseAt', 'lastActivityAt', 'resolution', 'satisfaction', 'sourceUrl', 'internalNotes']) {
+    if (!enquiryFields.includes(f)) problems.push(`Enquiry lacks ${f}`);
+  }
+  if (!declaredIn('src/objects/enquiry-message.object.ts').includes('messageId')) problems.push('EnquiryMessage lacks messageId (email-to-ticket dedupe key)');
+  if (!/uniqueText\(\{\s*universalIdentifier: F\.messageId/.test(read('src/objects/enquiry-message.object.ts'))) problems.push('EnquiryMessage.messageId must be uniqueText');
+
+  const PLAN_FIELDS = {
+    'src/objects/ticket-macro.object.ts': ['name', 'shortcut', 'responseTemplate', 'category', 'appendSignature', 'productCategory', 'serviceInterest'],
+    'src/objects/sla-policy.object.ts': ['name', 'description', 'priority', 'firstResponseHours', 'resolutionHours', 'isActive'],
+  };
+  for (const [file, names] of Object.entries(PLAN_FIELDS)) {
+    if (!existsSync(join(ROOT, file))) { problems.push(`${file} missing`); continue; }
+    const declared = declaredIn(file);
+    const missing = names.filter((n) => !declared.includes(n));
+    const extra = declared.filter((n) => !names.includes(n));
+    if (missing.length || extra.length) problems.push(`${file}: fields missing [${missing}] extra [${extra}]`);
+  }
+
+  for (const file of ['staff-ticket-inbox', 'my-tickets', 'overdue-tickets']) {
+    if (!existsSync(join(ROOT, `src/views/${file}.view.ts`))) problems.push(`src/views/${file}.view.ts missing`);
+  }
+  const inbox = read('src/views/staff-ticket-inbox.view.ts');
+  if (!/IS_NOT,\s*\n\s*value: \['CLOSED', 'SPAM'\]/.test(inbox)) problems.push('staff ticket inbox must filter out CLOSED and SPAM');
+  if (!/E\.priority,\s*\n\s*direction: ViewSortDirection\.DESC/.test(inbox) || !/E\.slaTarget,\s*\n\s*direction: ViewSortDirection\.ASC/.test(inbox)) problems.push('staff ticket inbox must sort priority DESC, slaTarget ASC');
+  if (!/IS_IN_PAST/.test(read('src/views/overdue-tickets.view.ts'))) problems.push('overdue tickets must filter slaTarget in the past');
+  if (!/E\.assignedTo/.test(read('src/views/my-tickets.view.ts'))) problems.push('my tickets must filter on assignedTo');
+
+  const layout = read('src/page-layouts/enquiry-record.page-layout.ts');
+  for (const tab of ["'Thread'", "'Details'", "'Macros'"]) if (!layout.includes(`title: ${tab}`)) problems.push(`enquiry-record page layout lacks the ${tab} tab`);
+  for (const w of ['enquiryActionsBar', 'applyMacroPanel']) if (!layout.includes(w)) problems.push(`enquiry-record page layout lacks ${w}`);
+  for (const c of ['TicketStatsWidget', 'EnquiryActionsBar', 'ApplyMacroPanel']) {
+    if (!existsSync(join(ROOT, `src/front-components/${c}.tsx`))) problems.push(`src/front-components/${c}.tsx missing`);
+  }
+  if (!read('src/page-layouts/today-dashboard.page-layout.ts').includes('ticketStatsWidget')) problems.push('Today dashboard lacks the ticket stats widget');
+  if (!existsSync(join(ROOT, 'src/functions/email-to-ticket.ts'))) problems.push('src/functions/email-to-ticket.ts missing');
+
+  const sla = await import(pathToFileURL(join(ROOT, 'shared/sla.mjs')).href);
+  const want = { URGENT: [1, 8], HIGH: [4, 24], NORMAL: [8, 48], LOW: [24, 96] };
+  for (const [priority, [first, resolution]] of Object.entries(want)) {
+    const p = sla.DEFAULT_SLA_POLICIES.find((x) => x.priority === priority);
+    if (!p || p.firstResponseHours !== first || p.resolutionHours !== resolution || !p.isActive) problems.push(`SLA default ${priority} must be ${first}h/${resolution}h`);
+  }
+  if (new Set(sla.DEFAULT_SLA_POLICIES.map((p) => p.name)).size !== 4) problems.push('SLA policy names must be unique (seed key)');
+  const t0 = new Date('2026-10-04T08:00:00Z');
+  if (sla.slaTargetFor('HIGH', [], t0) !== '2026-10-04T12:00:00.000Z') problems.push('slaTargetFor(HIGH) must be created + 4h');
+  if (sla.slaTargetFor('NORMAL', [{ priority: 'NORMAL', firstResponseHours: 2, isActive: true }], t0) !== '2026-10-04T10:00:00.000Z') problems.push('slaTargetFor must prefer the CRM policy');
+  if (sla.slaTargetFor('NORMAL', [{ priority: 'NORMAL', firstResponseHours: 2, isActive: false }], t0) !== '2026-10-04T16:00:00.000Z') problems.push('slaTargetFor must ignore an inactive policy');
+
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (!same(sla.parseSender('"Li Wei" <Li.Wei@Acme-Battery.cn>'), { name: 'Li Wei', email: 'li.wei@acme-battery.cn' })) problems.push('parseSender: display name + address');
+  if (!same(sla.parseSender('sales@acme.cn'), { name: '', email: 'sales@acme.cn' })) problems.push('parseSender: bare address');
+  if (sla.parseSender('nonsense').email !== '') problems.push('parseSender must reject a non-address');
+  if (sla.contactNameFor({ name: '', email: 'li.wei@acme.cn' }) !== 'Li Wei') problems.push('contactNameFor: local part fallback');
+  if (!same(sla.messageIds('<a@x> <b@y>,  c@z'), ['a@x', 'b@y', 'c@z'])) problems.push('messageIds must strip angle brackets');
+  if (sla.referenceInSubject('Re: [ENQ-261003-7K2Q] Your enquiry') !== 'ENQ-261003-7K2Q' || sla.referenceInSubject('hello') !== null) problems.push('referenceInSubject');
+  if (sla.cleanSubject('Re: RE: Fwd: DPP question') !== 'DPP question') problems.push('cleanSubject');
+  if (sla.detectLanguage('请问你们提供欧代服务吗？ DPP') !== 'ZH' || sla.detectLanguage('Do you offer DPP?') !== 'EN') problems.push('detectLanguage');
+  const rules = [
+    { name: 'catch-all', priority: 9, isActive: true, assignToId: 'c' },
+    { name: 'zh', language: 'ZH', priority: 2, isActive: true, assignToId: 'z' },
+    { name: 'off', priority: 0, isActive: false, assignToId: 'o' },
+    { name: 'dpp', category: 'DPP', priority: 1, isActive: true, assignToId: 'd' },
+  ];
+  if (sla.pickRoutingRule(rules, { language: 'ZH' })?.assignToId !== 'z') problems.push('pickRoutingRule: lowest priority number among matches, inactive skipped');
+  if (sla.pickRoutingRule(rules, { language: 'EN' })?.assignToId !== 'c') problems.push('pickRoutingRule: falls back to the catch-all');
+  if (sla.pickRoutingRule([], { language: 'EN' }) !== null) problems.push('pickRoutingRule: no rules → null');
+  if (sla.statusAfterInbound('PENDING') !== 'OPEN' || sla.statusAfterInbound('CLOSED') !== 'OPEN' || sla.statusAfterInbound('NEW') !== 'NEW' || sla.statusAfterInbound('SPAM') !== 'SPAM') problems.push('statusAfterInbound');
+
+  const optionsSource = read('src/options.ts');
+  const statuses = [...(/export const ENQUIRY_STATUS = options\(\[([\s\S]*?)\]\);/.exec(optionsSource)?.[1] ?? '').matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  const priorities = [...(/export const ENQUIRY_PRIORITY = options\(\[([\s\S]*?)\]\);/.exec(optionsSource)?.[1] ?? '').matchAll(/\['([A-Z_]+)',/g)].map((m) => m[1]);
+  if (!same(priorities, sla.PRIORITIES)) problems.push(`ENQUIRY_PRIORITY [${priorities}] ≠ shared/sla.mjs PRIORITIES`);
+  for (const status of ['OPEN', 'PENDING', 'CLOSED']) if (!statuses.includes(status)) problems.push(`ENQUIRY_STATUS lacks ${status} (used by email-to-ticket)`);
+
+  const tm = await import(pathToFileURL(join(ROOT, 'shared/ticket-macros.mjs')).href);
+  const base = ['Acknowledge receipt', 'Canton Fair follow-up', 'Request more info', 'Schedule call'];
+  for (const name of base) for (const lang of ['EN', 'ZH']) {
+    if (!tm.TICKET_MACROS.some((m) => m.name === `${name} · ${lang}`)) problems.push(`macro seed lacks "${name} · ${lang}"`);
+  }
+  if (new Set(tm.TICKET_MACROS.map((m) => m.name)).size !== tm.TICKET_MACROS.length) problems.push('macro names must be unique (seed key)');
+  if (new Set(tm.TICKET_MACROS.map((m) => m.shortcut)).size !== tm.TICKET_MACROS.length) problems.push('macro shortcuts must be unique');
+  for (const m of tm.TICKET_MACROS) if (!tm.MACRO_CATEGORIES.includes(m.category)) problems.push(`macro ${m.name}: bad category ${m.category}`);
+  const ack = tm.TICKET_MACROS.find((m) => m.name === 'Acknowledge receipt · EN');
+  const rendered = tm.renderMacro(ack, { reference: 'ENQ-261003-7K2Q', name: 'Li Wei', company: 'Acme', category: 'DPP', language: 'EN' });
+  if (!rendered.includes("We've received your enquiry (ENQ-261003-7K2Q) and will get back to you within 24 hours.") || !rendered.startsWith('Hello Li Wei,') || !rendered.includes('Integra Scientific')) problems.push('renderMacro (EN acknowledge) output is wrong');
+  if (/\{\{/.test(tm.renderMacro(tm.TICKET_MACROS.find((m) => m.name === 'Schedule call · ZH'), { reference: 'R', name: '', company: '', category: 'OTHER', language: 'ZH' }))) problems.push('renderMacro leaves placeholders behind');
+  if (!tm.macroApplies({ serviceInterest: null, category: 'RESPONSE' }, { category: 'DPP' }) || tm.macroApplies({ serviceInterest: 'AR', category: 'RESPONSE' }, { category: 'DPP' }) || tm.macroApplies({ serviceInterest: null, category: 'INTERNAL_ACTION' }, { category: 'DPP' })) problems.push('macroApplies');
+
+  for (const file of ['ops/seed-ticket-macros.mjs', 'ops/seed-sla-policies.mjs']) if (!existsSync(join(ROOT, file))) problems.push(`${file} missing`);
+
+  if (problems.length) fail(`E3 ticket management: ${problems.join('; ')}`);
+  else ok(`E3 ticket management: Enquiry ticket fields, TicketMacro + SlaPolicy, inbox / my / overdue views, Thread/Details/Macros tabs, ${sla.DEFAULT_SLA_POLICIES.length} SLA defaults, ${tm.TICKET_MACROS.length} EN/ZH macros; email-to-ticket sender parsing, threading ids, routing and status rules`);
 }
 
 // ----------------------------------------------------------------- report

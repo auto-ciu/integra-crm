@@ -3,7 +3,7 @@
  * inbound message, a staff reply, or an internal note.
  */
 import { defineObject } from '../lib/sdk';
-import { boolean, dateTime, manyToOne, richText, select, text } from '../lib/fields';
+import { boolean, dateTime, manyToOne, richText, select, text, uniqueText } from '../lib/fields';
 import { IDS } from '../ids';
 import { MESSAGE_DIRECTION } from '../options';
 
@@ -65,6 +65,13 @@ export default defineObject({
       name: 'isAutoReply',
       label: 'Auto-reply · 自动回复',
       icon: 'IconRobot',
+    }),
+    uniqueText({
+      universalIdentifier: F.messageId,
+      name: 'messageId',
+      label: 'Message-ID · 邮件ID',
+      icon: 'IconKey',
+      description: 'E-mail Message-ID header: email-to-ticket dedupes and threads by it',
     }),
   ],
 });
